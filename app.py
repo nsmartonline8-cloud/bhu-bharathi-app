@@ -158,17 +158,15 @@ def empty_file():
 
         "first_ppb": "",
 
-        "first_aadhaar": "[Aadhaar Redacted]",
-
         "first_name": "",
+
+        "first_age": 0,
 
         "first_relation": "S/o",
 
         "first_relation_name": "",
 
-        "first_age": 0,
-
-        "first_death_date": "",
+        "first_aadhaar": "",
 
         "first_house": "",
 
@@ -206,7 +204,7 @@ def empty_file():
 
         "first_family_board_resolution_date": "",
 
-        "first_family_aadhaar": "[Aadhaar Redacted]",
+        "first_family_aadhaar": "",
 
         "first_family_house": "",
 
@@ -241,7 +239,7 @@ def empty_file():
 
         "second_relation_name": "",
 
-        "second_aadhaar": "[Aadhaar Redacted]",
+        "second_aadhaar": "",
 
         "second_house": "",
 
@@ -287,7 +285,7 @@ def empty_file():
 
         "second_family_board_resolution_date": "",
 
-        "second_family_aadhaar": "[Aadhaar Redacted]",
+        "second_family_aadhaar": "",
 
         "second_family_house": "",
 
@@ -801,8 +799,6 @@ def collect_data():
         "first_name",
 
         "first_age",
-
-        "first_death_date",
 
         "first_relation",
 
@@ -1849,7 +1845,7 @@ def create_pdf(
 
                 "",
 
-                "Auth. Address",
+                "Address",
 
                 pdf_text(auth_address)
 
@@ -2980,9 +2976,7 @@ def person_form(
 
     show_caste_gender=False,
 
-    is_bank=False,
-
-    is_succession=False
+    is_bank=False
 
 ):
 
@@ -3124,7 +3118,7 @@ def person_form(
 
             st.text_input(
 
-                "Bank House No.",
+                "Bank Branch H.No. / Bldg.",
 
                 value=data.get(f"{prefix}_house", ""),
 
@@ -3472,7 +3466,7 @@ def person_form(
 
             st.text_input(
 
-                "H.No.",
+                "H.No. / Bldg.",
 
                 value=data.get(f"{prefix}_family_house", ""),
 
@@ -3609,74 +3603,169 @@ def person_form(
     )
 
 
-    # Succession specific fields in order: PPB, Aadhaar, Name, Relation, Relation Name, Age, Death Date
-    if is_succession and prefix == "first":
+
+    name_column, age_column = (
+
+        st.columns(2)
+
+    )
+
+
+    with name_column:
+
         st.text_input(
-            "PPB No.",
-            value=data.get(f"{prefix}_ppb", ""),
-            key=f"{sheet}_{prefix}_ppb"
-        )
-    
-    # Aadhaar, Name, Relation for everyone
-    aadhaar_col, name_col = st.columns(2)
-    with aadhaar_col:
-        st.text_input(
-            "Aadhaar No.",
-            value=data.get(f"{prefix}_aadhaar", ""),
-            max_chars=12,
-            key=f"{sheet}_{prefix}_aadhaar"
-        )
-    with name_col:
-        st.text_input(
+
             f"{person_title.title()} Name",
-            value=data.get(f"{prefix}_name", ""),
-            key=f"{sheet}_{prefix}_name"
-        )
 
-    relation_options = ["S/o", "D/o", "W/o"]
-    saved_relation = data.get(f"{prefix}_relation", "S/o")
-    if saved_relation not in relation_options: saved_relation = "S/o"
+            value=(
 
-    rel_col, rel_name_col = st.columns([1, 2])
-    with rel_col:
-        st.selectbox(
-            "S/D/W/o",
-            relation_options,
-            index=relation_options.index(saved_relation),
-            key=f"{sheet}_{prefix}_relation"
-        )
-    with rel_name_col:
-        st.text_input(
-            "Father / Mother / Spouse",
-            value=data.get(f"{prefix}_relation_name", ""),
-            key=f"{sheet}_{prefix}_relation_name"
-        )
+                data.get(
 
-    # Age and Death Date for succession
-    if is_succession and prefix == "first":
-        age_col, death_col = st.columns(2)
-        with age_col:
-            st.number_input(
-                "Age",
-                min_value=0,
-                max_value=120,
-                value=int(data.get(f"{prefix}_age", 0)),
-                key=f"{sheet}_{prefix}_age"
+                    f"{prefix}_name",
+
+                    ""
+
+                )
+
+            ),
+
+            key=(
+
+                f"{sheet}_"
+
+                f"{prefix}_name"
+
             )
-        with death_col:
-            st.text_input(
-                "Date of Death",
-                value=data.get(f"{prefix}_death_date", ""),
-                placeholder="DD-MM-YYYY",
-                key=f"{sheet}_{prefix}_death_date"
-            )
-    else:
+
+        )
+
+
+    with age_column:
+
         st.number_input(
+
             "Age",
+
             min_value=0,
+
             max_value=120,
-            value=int(data.get(f"{prefix}_age", 0)),
-            key=f"{sheet}_{prefix}_age"
+
+            value=int(
+
+                data.get(
+
+                    f"{prefix}_age",
+
+                    0
+
+                )
+
+            ),
+
+            key=(
+
+                f"{sheet}_"
+
+                f"{prefix}_age"
+
+            )
+
+        )
+
+
+    relation_options = [
+
+        "S/o",
+
+        "D/o",
+
+        "W/o"
+
+    ]
+
+
+    saved_relation = (
+
+        data.get(
+
+            f"{prefix}_relation",
+
+            "S/o"
+
+        )
+
+    )
+
+
+    if saved_relation not in (
+        relation_options
+    ):
+
+        saved_relation = "S/o"
+
+
+    relation_column, relation_name_column = (
+
+        st.columns(2)
+
+    )
+
+
+    with relation_column:
+
+        st.selectbox(
+
+            "S/D/W/o",
+
+            relation_options,
+
+            index=(
+
+                relation_options.index(
+
+                    saved_relation
+
+                )
+
+            ),
+
+            key=(
+
+                f"{sheet}_"
+
+                f"{prefix}_relation"
+
+            )
+
+        )
+
+
+    with relation_name_column:
+
+        st.text_input(
+
+            "Father / Mother / Spouse",
+
+            value=(
+
+                data.get(
+
+                    f"{prefix}_relation_name",
+
+                    ""
+
+                )
+
+            ),
+
+            key=(
+
+                f"{sheet}_"
+
+                f"{prefix}_relation_name"
+
+            )
+
         )
 
 
@@ -3822,11 +3911,42 @@ def person_form(
             )
 
 
-    house_column, location_column = (
+    aadhaar_column, house_column = (
 
         st.columns(2)
 
     )
+
+
+    with aadhaar_column:
+
+        st.text_input(
+
+            "Aadhaar No.",
+
+            value=(
+
+                data.get(
+
+                    f"{prefix}_aadhaar",
+
+                    ""
+
+                )
+
+            ),
+
+            max_chars=12,
+
+            key=(
+
+                f"{sheet}_"
+
+                f"{prefix}_aadhaar"
+
+            )
+
+        )
 
 
     with house_column:
@@ -3858,6 +3978,13 @@ def person_form(
         )
 
 
+    location_column, state_column = (
+
+        st.columns(2)
+
+    )
+
+
     with location_column:
 
         st.text_input(
@@ -3885,13 +4012,6 @@ def person_form(
             )
 
         )
-
-
-    state_column, district_column = (
-
-        st.columns(2)
-
-    )
 
 
     with state_column:
@@ -3923,6 +4043,13 @@ def person_form(
         )
 
 
+    district_column, mandal_column = (
+
+        st.columns(2)
+
+    )
+
+
     with district_column:
 
         st.text_input(
@@ -3950,13 +4077,6 @@ def person_form(
             )
 
         )
-
-
-    mandal_column, village_column = (
-
-        st.columns(2)
-
-    )
 
 
     with mandal_column:
@@ -3988,6 +4108,13 @@ def person_form(
         )
 
 
+    village_column, pin_column = (
+
+        st.columns(2)
+
+    )
+
+
     with village_column:
 
         st.text_input(
@@ -4015,13 +4142,6 @@ def person_form(
             )
 
         )
-
-
-    pin_column, cell_column = (
-
-        st.columns(2)
-
-    )
 
 
     with pin_column:
@@ -4055,35 +4175,33 @@ def person_form(
         )
 
 
-    with cell_column:
+    st.text_input(
 
-        st.text_input(
+        "Cell No.",
 
-            "Cell No.",
+        value=(
 
-            value=(
+            data.get(
 
-                data.get(
+                f"{prefix}_cell",
 
-                    f"{prefix}_cell",
-
-                    ""
-
-                )
-
-            ),
-
-            max_chars=10,
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_cell"
+                ""
 
             )
 
+        ),
+
+        max_chars=10,
+
+        key=(
+
+            f"{sheet}_"
+
+            f"{prefix}_cell"
+
         )
+
+    )
 
 
     # =====================================================
@@ -4457,8 +4575,7 @@ with first_column:
 
         "first",
 
-        first_title,
-        is_succession=(selected_document == "SUCCESSION")
+        first_title
 
     )
 
