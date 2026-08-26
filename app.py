@@ -358,7 +358,60 @@ def show_login_screen():
 if "nsmart_authenticated" not in st.session_state:
     st.session_state.nsmart_authenticated = False
 
-if not st.session_state.nsmart_authenticated:
+
+# =========================================================
+# DASHBOARD SAVED-SHEET OPEN ACCESS
+# =========================================================
+# Saved sheets opened from Dashboard/Search open in a new tab. A new browser
+# tab has a fresh Streamlit session, so it would normally show the login page
+# again. Only links explicitly created by the Dashboard/Search use
+# dashboard_open=1. For those links, allow direct viewing only when the
+# requested sheet exists and is already marked as saved.
+_dashboard_sheet_request = str(
+    st.query_params.get("sheet", "")
+).strip().upper()
+
+_dashboard_open_request = str(
+    st.query_params.get("dashboard_open", "")
+).strip()
+
+_dashboard_saved_sheet_access = False
+
+if (
+    _dashboard_open_request == "1"
+    and _dashboard_sheet_request
+):
+    try:
+        _dashboard_data_file = "bhu_bharathi_data.json"
+        if os.path.exists(_dashboard_data_file):
+            with open(
+                _dashboard_data_file,
+                "r",
+                encoding="utf-8"
+            ) as _dashboard_file:
+                _dashboard_database = json.load(_dashboard_file)
+
+            _dashboard_sheet_data = (
+                _dashboard_database.get(
+                    _dashboard_sheet_request,
+                    {}
+                )
+            )
+
+            _dashboard_saved_sheet_access = bool(
+                _dashboard_sheet_data.get(
+                    "saved",
+                    False
+                )
+            )
+    except Exception:
+        _dashboard_saved_sheet_access = False
+
+
+if (
+    not st.session_state.nsmart_authenticated
+    and not _dashboard_saved_sheet_access
+):
     show_login_screen()
     st.stop()
 
@@ -1621,12 +1674,6 @@ def search_files(
 
     fields = [
 
-        # Sheet / transaction identifiers
-        "transaction_number",
-        "document_type",
-
-        # Primary party details
-        "first_ppb",
         "first_name",
 
         "first_aadhaar",
@@ -1641,8 +1688,6 @@ def search_files(
 
         "first_family_cell",
 
-        # Secondary party details
-        "second_ppb",
         "second_name",
 
         "second_aadhaar",
@@ -3524,10 +3569,10 @@ if navigation == "📊 Dashboard":
                         primary_name = saved_sheet_data.get("first_name", "") or "—"
                         st.markdown(
                             f"""
-                            <a href="?sheet={saved_sheet_name}" target="_blank"
+                            <a href="?sheet={saved_sheet_name}&dashboard_open=1" target="_blank"
                                style="text-decoration:none; display:block;">
                               <div style="min-height:145px; padding:16px; border:1px solid #26364d;
-                                          border-radius:14px; background:#111c2f; margin-bottom:12px; cursor:pointer;">
+                                          border-radius:14px; background:#111c2f; margin-bottom:8px; cursor:pointer;">
                                 <div style="font-size:28px;">📄</div>
                                 <div style="font-size:20px; font-weight:850; color:#7dd3fc; margin-top:5px;">{saved_sheet_name}</div>
                                 <div style="font-size:11px; color:#94a3b8; margin-top:5px;">{document_type}</div>
@@ -3538,6 +3583,44 @@ if navigation == "📊 Dashboard":
                             """,
                             unsafe_allow_html=True
                         )
+
+                        # Dashboard-only sheet deletion with an explicit confirmation step.
+                        if st.session_state.get("dashboard_delete_confirm") == saved_sheet_name:
+                            st.warning(
+                                f"Are you sure you want to permanently delete {saved_sheet_name}?"
+                            )
+                            confirm_column, cancel_column = st.columns(2)
+
+                            with confirm_column:
+                                if st.button(
+                                    "YES, DELETE",
+                                    key=f"dashboard_confirm_delete_{saved_sheet_name}",
+                                    use_container_width=True
+                                ):
+                                    if saved_sheet_name in st.session_state.database:
+                                        del st.session_state.database[saved_sheet_name]
+                                        save_database()
+
+                                    st.session_state.pop("dashboard_delete_confirm", None)
+                                    st.success(f"{saved_sheet_name} deleted successfully.")
+                                    st.rerun()
+
+                            with cancel_column:
+                                if st.button(
+                                    "CANCEL",
+                                    key=f"dashboard_cancel_delete_{saved_sheet_name}",
+                                    use_container_width=True
+                                ):
+                                    st.session_state.pop("dashboard_delete_confirm", None)
+                                    st.rerun()
+                        else:
+                            if st.button(
+                                "🗑️ DELETE SHEET",
+                                key=f"dashboard_delete_sheet_{saved_sheet_name}",
+                                use_container_width=True
+                            ):
+                                st.session_state["dashboard_delete_confirm"] = saved_sheet_name
+                                st.rerun()
     else:
         st.info("No saved sheets yet. Saved files will appear here.")
 
@@ -3692,9 +3775,9 @@ with search_column:
 
             placeholder=(
 
-                "Name, cell, Aadhaar, PPB NO., "
+                "Name, cell, Aadhaar "
 
-                "TXN NO. or NS-0001"
+                "or NS-0001"
 
             ),
 
@@ -3766,7 +3849,7 @@ if search_text.strip():
 
                 # Opens the selected saved sheet in a new browser tab.
                 st.markdown(
-                    f"""<a href="?sheet={result}" target="_blank"
+                    f"""<a href="?sheet={result}&dashboard_open=1" target="_blank"
                     style="display:block; text-align:center; padding:0.55rem 0.7rem;
                     border-radius:8px; background:#1d4ed8; color:white;
                     text-decoration:none; font-weight:700;">📂 OPEN ↗</a>""",
@@ -3803,14 +3886,6 @@ st.markdown(
 
     unsafe_allow_html=True
 
-)
-
-
-# TXN NO. is common to every document type and sits directly below the document heading.
-st.text_input(
-    "TXN NO.",
-    value=data.get("transaction_number", ""),
-    key=f"{sheet}_transaction_number"
 )
 
 
@@ -3854,15 +3929,33 @@ def person_form(
         )
 
 
-        st.text_input(
+        name_col, txn_col = st.columns(2)
 
-            "BANK NAME",
 
-            value=data.get(f"{prefix}_name", ""),
+        with name_col:
 
-            key=f"{sheet}_{prefix}_name"
+            st.text_input(
 
-        )
+                "BANK NAME",
+
+                value=data.get(f"{prefix}_name", ""),
+
+                key=f"{sheet}_{prefix}_name"
+
+            )
+
+
+        with txn_col:
+
+            st.text_input(
+
+                "TXN No.",
+
+                value=data.get("transaction_number", ""),
+
+                key=f"{sheet}_transaction_number"
+
+            )
 
 
         cin_col, gstin_col = st.columns(2)
@@ -4466,34 +4559,6 @@ def person_form(
             st.date_input("DOD", value=dod_value, min_value=date(1, 1, 1), max_value=date(9999, 12, 31), key=f"{sheet}_first_dod")
 
     else:
-
-        # PPB field placement:
-        # - First person (Seller/Donor/Mortgagor/etc.): always before the name.
-        # - Second person: optional PPB field for SALE, GIFT and MORTGAGE.
-        show_ppb_field = (
-            prefix == "first"
-            or (
-                prefix == "second"
-                and ppb_optional
-                and selected_document in ["SALE", "GIFT", "MORTGAGE"]
-            )
-        )
-
-        if show_ppb_field:
-            ppb_label = (
-                "PPB NO."
-                if prefix == "first"
-                else "IF HAVE PPB NO."
-            )
-
-            st.text_input(
-                ppb_label,
-                value=data.get(
-                    f"{prefix}_ppb",
-                    ""
-                ),
-                key=f"{sheet}_{prefix}_ppb"
-            )
 
         name_column, age_column = st.columns(2)
 
@@ -6232,21 +6297,15 @@ with payment_column:
     data["challan_amount"] = float(challan_amount)
     data["charges"] = float(charges)
 
-    # LIVE CALCULATIONS: always calculate from the values currently visible on screen.
-    challan_amount = float(challan_amount or 0.0)
-    charges = float(charges or 0.0)
-    total_payable = challan_amount + charges
+    # Automatically calculated from Challan + Charges.
+    total_payable = float(challan_amount) + float(charges)
 
-    # Keep all current values synchronized immediately for saving/PDF/email.
-    data["challan_amount"] = challan_amount
-    data["charges"] = charges
-    data["total_payable"] = total_payable
-
-    # Fresh calculated display. No persistent key, so Streamlit cannot reuse an old value.
-    st.text_input(
+    st.number_input(
         "TOTAL PAYABLE",
-        value=f"{total_payable:.2f}",
-        disabled=True
+        min_value=0.0,
+        value=float(total_payable),
+        disabled=True,
+        key=f"{sheet}_total_payable_display"
     )
 
     if st.button(
@@ -6439,29 +6498,19 @@ with payment_column:
 
         # Keep the live value in the current sheet data so totals and later saves
         # always use what is currently entered in the widgets.
-        # Update the real payment record for this sheet immediately.
-        for _live_payment in data["payments"]:
-            if _live_payment.get("id") == payment_id:
-                _live_payment["amount"] = float(amount)
-                _live_payment["payment_mode"] = payment_mode
-                break
-
+        payment["amount"] = float(amount)
+        payment["payment_mode"] = payment_mode
         payment_values.append(float(amount))
 
 
     # Calculate the totals LIVE from every visible payment row.
-    total_paid = sum(float(value or 0.0) for value in payment_values)
-
-    # Recalculate the complete chain from current screen values.
-    total_payable = float(challan_amount or 0.0) + float(charges or 0.0)
-    balance = total_payable - total_paid
+    total_paid = sum(
+        payment_values
+    )
 
     # Keep calculated values in the current sheet data as well.
-    data["challan_amount"] = float(challan_amount or 0.0)
-    data["charges"] = float(charges or 0.0)
     data["total_paid"] = float(total_paid)
     data["total_payable"] = float(total_payable)
-    data["balance_amount"] = float(balance)
 
 
     total_column, balance_column = (
@@ -6473,33 +6522,59 @@ with payment_column:
 
     with total_column:
 
-        # Fresh calculated display: automatically sums every Amount Paid row.
-        st.text_input(
+        st.number_input(
 
             "Total Amount Paid",
 
-            value=f"{float(total_paid):.2f}",
+            value=float(
+                total_paid
+            ),
 
-            disabled=True
+            disabled=True,
+
+            key=(
+
+                f"{sheet}_"
+
+                "total_paid_display"
+
+            )
 
         )
 
 
     with balance_column:
 
-        # Already calculated above from the current Challan + Charges and all payments.
-        balance = float(balance)
+        balance = (
+
+            total_payable
+
+            -
+
+            total_paid
+
+        )
+
 
         data["balance_amount"] = float(balance)
 
-        # Fresh calculated display: Total Payable - Total Amount Paid.
-        st.text_input(
+        st.number_input(
 
             "Balance Amount",
 
-            value=f"{float(balance):.2f}",
+            value=float(
+                balance
+            ),
 
-            disabled=True
+            disabled=True,
+
+            key=(
+
+                f"{sheet}_"
+
+                "balance_display"
+
+            )
 
         )
 
@@ -6705,32 +6780,33 @@ def _send_pdf_email(sheet_name, pdf_data, recipient_override=None):
 # =========================================================
 
 # =========================================================
-# ALWAYS-VISIBLE PDF ACTIONS
+# SAVE + DOWNLOAD + PRINT ACTIONS
 # =========================================================
-# Download and Print must always be visible. Build a fresh PDF from the
-# current sheet data on each page run instead of hiding the buttons until
-# a previously saved PDF file exists.
 
-_current_sheet_for_actions = sheet
+# Keep the three actions together. If this sheet has already been saved,
+# use the existing PDF; otherwise build a temporary PDF from the current data
+# so Download/Print are still available without removing any existing features.
+_current_sheet_for_actions = st.session_state.get("current_sheet", sheet)
+_current_pdf_for_actions = st.session_state.get("saved_pdf", b"")
 
-try:
-    _current_data_for_actions = st.session_state.database[sheet]
-    _current_pdf_for_actions = create_pdf(
-        _current_sheet_for_actions,
-        _current_data_for_actions
+if (
+    not _current_pdf_for_actions
+    or st.session_state.get("saved_sheet") != _current_sheet_for_actions
+):
+    _pdf_file_for_actions = os.path.join(
+        PDF_FOLDER,
+        f"{_current_sheet_for_actions}.pdf"
     )
-except Exception:
-    _current_pdf_for_actions = b""
+    if os.path.exists(_pdf_file_for_actions):
+        try:
+            with open(_pdf_file_for_actions, "rb") as _pdf_action_file:
+                _current_pdf_for_actions = _pdf_action_file.read()
+        except Exception:
+            _current_pdf_for_actions = b""
 
-_save_col, _download_col, _print_col = st.columns(3)
+_action_save_col, _action_download_col, _action_print_col = st.columns(3)
 
-with _save_col:
-    st.markdown(
-        '<div style="height:1px;"></div>',
-        unsafe_allow_html=True
-    )
-
-with _download_col:
+with _action_download_col:
     if _current_pdf_for_actions:
         st.download_button(
             "📄 DOWNLOAD PDF",
@@ -6738,59 +6814,81 @@ with _download_col:
             file_name=f"{_current_sheet_for_actions}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            key=f"download_pdf_visible_{_current_sheet_for_actions}"
+            key=f"download_pdf_near_save_{_current_sheet_for_actions}"
         )
     else:
         st.button(
             "📄 DOWNLOAD PDF",
             disabled=True,
             use_container_width=True,
-            key=f"download_pdf_visible_disabled_{_current_sheet_for_actions}"
+            key=f"download_pdf_disabled_{_current_sheet_for_actions}",
+            help="Save the file once to generate the PDF."
         )
 
-with _print_col:
+with _action_print_col:
     if _current_pdf_for_actions:
+        # Use a Blob URL instead of a huge data: URL. Some browsers open large
+        # PDF data URLs as blank pages, which was causing the blank print window.
         _print_b64 = base64.b64encode(
             _current_pdf_for_actions
         ).decode("utf-8")
 
         _print_html = f"""
         <html>
-        <body style="margin:0;">
-        <button id="print_document_button" style="
-            width:100%;
-            padding:0.62rem 0.8rem;
-            border:none;
-            border-radius:8px;
-            font-weight:700;
-            cursor:pointer;
-        ">🖨️ PRINT DOCUMENT</button>
-        <script>
-        document.getElementById("print_document_button").onclick = function() {{
-            const binary = atob("{_print_b64}");
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {{
-                bytes[i] = binary.charCodeAt(i);
-            }}
-            const blob = new Blob([bytes], {{type:"application/pdf"}});
-            const url = URL.createObjectURL(blob);
-            const win = window.open(url, "_blank");
-            if (win) {{
-                win.onload = function() {{
-                    try {{ win.print(); }} catch(e) {{}}
-                }};
-            }} else {{
-                alert("Please allow pop-ups to print the document.");
-            }}
-        }};
-        </script>
+        <body style="margin:0;padding:0;">
+            <button id="printBtn" style="
+                width:100%;
+                border:none;
+                border-radius:8px;
+                padding:0.62rem 0.8rem;
+                font-size:14px;
+                font-weight:700;
+                cursor:pointer;
+                background:#16a34a;
+                color:white;
+            ">🖨️ PRINT DOCUMENT</button>
+
+            <script>
+            document.getElementById("printBtn").addEventListener("click", function() {{
+                try {{
+                    const base64 = "{_print_b64}";
+                    const binary = atob(base64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {{
+                        bytes[i] = binary.charCodeAt(i);
+                    }}
+
+                    const blob = new Blob([bytes], {{
+                        type: "application/pdf"
+                    }});
+                    const url = URL.createObjectURL(blob);
+
+                    const printWindow = window.open(url, "_blank");
+                    if (printWindow) {{
+                        setTimeout(function() {{
+                            try {{
+                                printWindow.focus();
+                                printWindow.print();
+                            }} catch (e) {{
+                                console.error(e);
+                            }}
+                        }}, 1200);
+                    }} else {{
+                        alert("Please allow pop-ups to print the document.");
+                    }}
+                }} catch (err) {{
+                    console.error(err);
+                    alert("Unable to prepare the document for printing.");
+                }}
+            }});
+            </script>
         </body>
         </html>
         """
 
         st.components.v1.html(
             _print_html,
-            height=55,
+            height=52,
             scrolling=False
         )
     else:
@@ -6798,144 +6896,93 @@ with _print_col:
             "🖨️ PRINT DOCUMENT",
             disabled=True,
             use_container_width=True,
-            key=f"print_pdf_visible_disabled_{_current_sheet_for_actions}"
+            key=f"print_pdf_disabled_{_current_sheet_for_actions}",
+            help="Save the file once to generate the PDF."
         )
 
+with _action_save_col:
+    if st.button(
+        "💾 SAVE FILE",
+        type="primary",
+        use_container_width=True,
+        key=(
+            f"{sheet}_"
+            "save_file"
+        )
+    ):
 
+        collect_data()
 
-if st.button(
-
-    "💾 SAVE FILE",
-
-    type="primary",
-
-    use_container_width=True,
-
-    key=(
-
-        f"{sheet}_"
-
-        "save_file"
-
-    )
-
-):
-
-    collect_data()
-
-
-    data = (
-
-        st.session_state.database[
-
-            sheet
-
-        ]
-
-    )
-
-
-    calculated_extent, invalid = (
-
-        total_extent(
-
-            data["surveys"]
-
+        data = (
+            st.session_state.database[
+                sheet
+            ]
         )
 
-    )
-
-
-    if invalid:
-
-        st.error(
-
-            "The file was not saved. "
-
-            "Correct the invalid "
-
-            "extent first."
-
+        calculated_extent, invalid = (
+            total_extent(
+                data["surveys"]
+            )
         )
 
+        if invalid:
 
-    else:
-
-        data["saved"] = True
-
-
-        save_database()
-
-
-        pdf_bytes = (
-
-            create_pdf(
-
-                sheet,
-
-                data
-
+            st.error(
+                "The file was not saved. "
+                "Correct the invalid "
+                "extent first."
             )
 
-        )
-
-
-        pdf_path = (
-
-            os.path.join(
-
-                PDF_FOLDER,
-
-                f"{sheet}.pdf"
-
-            )
-
-        )
-
-
-        with open(
-
-            pdf_path,
-
-            "wb"
-
-        ) as pdf_file:
-
-            pdf_file.write(
-
-                pdf_bytes
-
-            )
-
-
-        st.session_state[
-
-            "saved_pdf"
-
-        ] = pdf_bytes
-
-
-        st.session_state[
-
-            "saved_sheet"
-
-        ] = sheet
-
-
-        st.session_state[
-
-            "show_saved_options"
-
-        ] = True
-
-
-        # Automatically send the generated PDF to the configured email on every save.
-        email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
-
-        if email_ok:
-            st.success(f"{sheet} saved successfully. {email_message}")
         else:
-            st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
+
+            data["saved"] = True
+
+            save_database()
+
+            pdf_bytes = (
+                create_pdf(
+                    sheet,
+                    data
+                )
+            )
+
+            pdf_path = (
+                os.path.join(
+                    PDF_FOLDER,
+                    f"{sheet}.pdf"
+                )
+            )
+
+            with open(
+                pdf_path,
+                "wb"
+            ) as pdf_file:
+
+                pdf_file.write(
+                    pdf_bytes
+                )
+
+            st.session_state[
+                "saved_pdf"
+            ] = pdf_bytes
+
+            st.session_state[
+                "saved_sheet"
+            ] = sheet
+
+            st.session_state[
+                "show_saved_options"
+            ] = True
+
+            # Automatically send the generated PDF to the configured email on every save.
+            email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
+
+            if email_ok:
+                st.success(f"{sheet} saved successfully. {email_message}")
+            else:
+                st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
+
+            st.rerun()
 
 
 # =========================================================
