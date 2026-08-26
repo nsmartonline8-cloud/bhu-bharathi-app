@@ -254,3 +254,63 @@ div[data-testid="stTextInput"] input:disabled {
     .app-header, .bhu-header { padding: 20px !important; border-radius: 14px !important; }
     .section-title { padding: 10px 12px !important; }
 }
+/* =========================================
+   FIX INVISIBLE DOWNLOAD PDF BUTTON TEXT
+========================================= */
+
+.stDownloadButton > button,
+[data-testid="stDownloadButton"] > button {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.stDownloadButton > button *,
+[data-testid="stDownloadButton"] > button * {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+
+/* =========================================
+   FIX DOCUMENT TYPE DROPDOWN TEXT
+========================================= */
+
+/* Selected value */
+[data-baseweb="select"] {
+    color: #111827 !important;
+}
+
+[data-baseweb="select"] * {
+    -webkit-text-fill-color: #111827;
+}
+
+/* Dropdown menu */
+[data-baseweb="popover"] {
+    background-color: #ffffff !important;
+}
+
+/* SALE / GIFT / MORTGAGE / SUCCESSION */
+[data-baseweb="menu"] {
+    background-color: #ffffff !important;
+}
+
+[data-baseweb="menu"] li {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+}
+
+[data-baseweb="menu"] li:hover {
+    background-color: #e5e7eb !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+}
+
+/* Extra protection for dropdown option text */
+[role="option"] {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+}
