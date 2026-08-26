@@ -1,0 +1,232 @@
+/* =========================================================
+   BHU BHARATHI — CINEMATIC PROFESSIONAL UI
+   Visual theme only. Application functionality is unchanged.
+   ========================================================= */
+
+:root {
+    --bb-bg: #07111f;
+    --bb-bg-deep: #040914;
+    --bb-panel: #0c1829;
+    --bb-panel-2: #101f34;
+    --bb-panel-soft: #13263f;
+    --bb-line: rgba(148, 163, 184, .18);
+    --bb-line-strong: rgba(96, 165, 250, .38);
+    --bb-text: #f4f7fb;
+    --bb-muted: #aab8ca;
+    --bb-blue: #3b82f6;
+    --bb-blue-bright: #60a5fa;
+    --bb-cyan: #67e8f9;
+    --bb-shadow: 0 18px 50px rgba(0, 0, 0, .30);
+}
+
+/* ---------- APP BACKGROUND ---------- */
+.stApp {
+    background:
+        radial-gradient(circle at 8% 8%, rgba(59,130,246,.13), transparent 28%),
+        radial-gradient(circle at 92% 18%, rgba(34,211,238,.07), transparent 25%),
+        linear-gradient(145deg, var(--bb-bg-deep), var(--bb-bg) 48%, #091729) !important;
+    color: var(--bb-text) !important;
+}
+
+.block-container {
+    max-width: 1550px !important;
+    padding-top: 1rem !important;
+    padding-bottom: 3rem !important;
+}
+
+/* ---------- TYPOGRAPHY ---------- */
+body, p, span, label, li {
+    color: var(--bb-text);
+}
+h1, h2, h3 { letter-spacing: .01em !important; }
+h1 { color: #ffffff !important; font-weight: 800 !important; }
+h2 { color: #eaf2ff !important; font-weight: 750 !important; }
+h3 { color: #dce9fa !important; font-weight: 720 !important; }
+
+/* ---------- MAIN APP HEADER ---------- */
+.app-header, .bhu-header {
+    background:
+        linear-gradient(135deg, rgba(7,17,31,.96), rgba(12,31,55,.96) 58%, rgba(25,67,120,.92)) !important;
+    border: 1px solid rgba(96,165,250,.24) !important;
+    border-radius: 18px !important;
+    box-shadow: var(--bb-shadow), inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+.app-title { color: #ffffff !important; }
+.app-subtitle, .bhu-header p { color: #b7c8dd !important; }
+
+/* ---------- DEED TITLE ---------- */
+.deed-title {
+    color: #f8fbff !important;
+    text-shadow: 0 4px 20px rgba(59,130,246,.20) !important;
+}
+
+/* ---------- SECTION TITLES ---------- */
+.section-title {
+    color: #dbeafe !important;
+    background: linear-gradient(135deg, rgba(15,32,54,.98), rgba(17,42,72,.92)) !important;
+    border: 1px solid rgba(96,165,250,.20) !important;
+    border-left: 4px solid var(--bb-blue) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 26px rgba(0,0,0,.18) !important;
+}
+/* Explicitly blue as requested */
+.land-details-title,
+.payment-details-title,
+.section-title.land-details-title,
+.section-title.payment-details-title {
+    color: #60a5fa !important;
+    border-left-color: #60a5fa !important;
+}
+
+.family-title, .bhu-box-title {
+    color: #9fd7ff !important;
+    background: linear-gradient(90deg, rgba(30,64,110,.36), rgba(30,64,110,.08)) !important;
+    border-left-color: var(--bb-blue-bright) !important;
+    border-radius: 9px !important;
+}
+
+/* ---------- CARDS / FORMS ---------- */
+.dashboard-card,
+.bhu-card,
+.bhu-search,
+[data-testid="stForm"],
+[data-testid="stMetric"],
+[data-testid="stExpander"] {
+    background: linear-gradient(145deg, rgba(13,27,45,.96), rgba(10,22,38,.98)) !important;
+    border: 1px solid var(--bb-line) !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.025) !important;
+}
+.dashboard-card, .bhu-card, .bhu-search, [data-testid="stForm"], [data-testid="stMetric"] {
+    border-radius: 15px !important;
+}
+[data-testid="stExpander"] { border-radius: 12px !important; }
+[data-testid="stExpander"]:hover { border-color: rgba(96,165,250,.32) !important; }
+
+.dashboard-label, [data-testid="stMetricLabel"] { color: var(--bb-muted) !important; }
+.dashboard-value, [data-testid="stMetricValue"] { color: #9fd7ff !important; }
+.dashboard-note { color: #c5d1df !important; }
+
+/* ---------- INPUTS ---------- */
+.stTextInput label, .stNumberInput label, .stDateInput label,
+.stSelectbox label, .stTextArea label, .stMultiSelect label,
+.stRadio label, .stCheckbox label, .stFileUploader label {
+    color: #b9c8d9 !important;
+    font-weight: 650 !important;
+}
+
+.stTextInput input, .stNumberInput input, .stDateInput input,
+.stTextArea textarea,
+[data-baseweb="select"] > div,
+[data-baseweb="input"] > div {
+    background: rgba(7,17,30,.86) !important;
+    color: #f8fafc !important;
+    border-color: rgba(148,163,184,.24) !important;
+    border-radius: 9px !important;
+}
+
+.stTextInput input:hover, .stNumberInput input:hover, .stDateInput input:hover,
+.stTextArea textarea:hover, [data-baseweb="select"] > div:hover {
+    border-color: rgba(96,165,250,.45) !important;
+}
+
+.stTextInput input:focus, .stNumberInput input:focus, .stDateInput input:focus,
+.stTextArea textarea:focus {
+    border-color: var(--bb-blue-bright) !important;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.14) !important;
+}
+
+.stTextInput input::placeholder, .stNumberInput input::placeholder,
+.stTextArea textarea::placeholder { color: #718198 !important; }
+
+/* ---------- SELECT DROPDOWNS ---------- */
+[data-baseweb="popover"], [role="listbox"] {
+    background: #0d1b2e !important;
+    color: var(--bb-text) !important;
+    border-color: var(--bb-line) !important;
+}
+[role="option"]:hover { background: rgba(59,130,246,.16) !important; }
+
+/* ---------- BUTTONS ---------- */
+.stButton > button,
+[data-testid="stFormSubmitButton"] > button {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(147,197,253,.32) !important;
+    border-radius: 9px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 7px 20px rgba(29,78,216,.20) !important;
+    transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
+}
+.stButton > button:hover,
+[data-testid="stFormSubmitButton"] > button:hover {
+    transform: translateY(-1px) !important;
+    filter: brightness(1.08) !important;
+    box-shadow: 0 10px 24px rgba(37,99,235,.30) !important;
+}
+
+/* ---------- EXPANDERS ---------- */
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary span {
+    color: #b8dcff !important;
+    font-weight: 750 !important;
+}
+
+/* ---------- SIDEBAR ---------- */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #050b15, #091526 55%, #0d1d33) !important;
+    border-right: 1px solid rgba(96,165,250,.14) !important;
+}
+[data-testid="stSidebar"] * { color: #e8f0fa !important; }
+[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255,255,255,.02) !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    text-align: left !important;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(59,130,246,.14) !important;
+    border-color: rgba(96,165,250,.24) !important;
+}
+
+/* ---------- TABLES / UPLOAD / DIVIDERS ---------- */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--bb-line) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+[data-testid="stFileUploader"] {
+    background: rgba(12,24,41,.75) !important;
+    border: 1px dashed rgba(96,165,250,.48) !important;
+    border-radius: 12px !important;
+}
+hr { border-color: rgba(148,163,184,.14) !important; }
+[data-testid="stAlert"] { border-radius: 10px !important; }
+.stCaption, small { color: #91a1b5 !important; }
+
+/* ---------- SHEET NUMBER ---------- */
+.sheet-box {
+    background: rgba(8,18,31,.72) !important;
+    border: 1px solid rgba(96,165,250,.30) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,.16) !important;
+}
+.sheet-label { color: #8ea1b7 !important; }
+.sheet-number { color: #dcebff !important; }
+.search-sheet {
+    background: rgba(10,23,39,.92) !important;
+    border-color: rgba(96,165,250,.30) !important;
+    color: #e8f2ff !important;
+}
+
+/* ---------- SCROLLBAR ---------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #07111f; }
+::-webkit-scrollbar-thumb { background: #294664; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #3a638b; }
+
+/* ---------- MOBILE ---------- */
+@media (max-width: 768px) {
+    .block-container { padding-left: .7rem !important; padding-right: .7rem !important; }
+    .app-header, .bhu-header { padding: 20px !important; border-radius: 14px !important; }
+    .section-title { padding: 10px 12px !important; }
+}
