@@ -382,3 +382,39 @@ li[role="option"]:hover {
     color: #111827 !important;
     -webkit-text-fill-color: #111827 !important;
 }
+/* =====================================================
+   CLEAN UI — HIDE FULLSCREEN IMAGE BUTTONS
+===================================================== */
+
+/* Hide fullscreen / expand buttons that appear on images */
+[data-testid="stImage"] button,
+[data-testid="stImage"] [data-testid="stImageToolbar"],
+[data-testid="stImage"] [data-testid="stImageFullscreen"],
+button[title*="fullscreen" i],
+button[aria-label*="fullscreen" i] {
+    display: none !important;
+}
+
+
+/* =====================================================
+   CLEAN UI — HIDE HEADING LINK / ANCHOR ICONS
+===================================================== */
+
+/* Hide the small link icon that appears beside headings */
+h1 a,
+h2 a,
+h3 a,
+h4 a,
+h5 a,
+h6 a,
+.stMarkdown a[data-testid="stHeaderLink"],
+[data-testid="stHeaderActionElements"],
+[data-testid="stHeading"] a {
+    display: none !important;
+}
+
+
+/* Hide anchor/link icons specifically */
+a[href^="#"] {
+    display: none !important;
+}
