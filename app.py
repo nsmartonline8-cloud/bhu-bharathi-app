@@ -1,3 +1,5 @@
+from sys import prefix
+
 import streamlit as st
 from datetime import date
 import json
@@ -6,7 +8,14 @@ import re
 import copy
 import html
 import base64
+import hashlib
+import hmac
+import secrets
+import time
+import smtplib
+from email.message import EmailMessage
 from io import BytesIO
+from pathlib import Path
 
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
@@ -20,21 +29,492 @@ from reportlab.platypus import (
     TableStyle
 )
 
+def load_css():
+    css_file = Path(__file__).parent / "style.css"
+
+    with open(css_file, "r", encoding="utf-8") as f:
+        st.markdown(
+            f"<style>{f.read()}</style>",
+            unsafe_allow_html=True
+        )
+
+load_css()
+
+# Hide Streamlit's built-in toolbar controls (fullscreen, menu/settings,
+# share/deploy utility buttons and footer branding).
+st.markdown(
+    """
+    <style>
+    [data-testid="stHeader"] {
+        display: none !important;
+    }
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    #MainMenu {
+        visibility: hidden !important;
+    }
+    footer {
+        visibility: hidden !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # =========================================================
 # APP SETTINGS
 # =========================================================
 
 st.set_page_config(
-    page_title="Bhu Bharathi Files",
-    page_icon="📁",
+    page_title="N-SMART | Secure Login",
+    page_icon="🔐",
     layout="wide"
 )
+
+
+# =========================================================
+# N-SMART SECURE LOGIN
+# =========================================================
+AUTH_FILE = Path(__file__).parent / "nsmart_auth.json"
+ACCOUNTS_FILE = Path(__file__).parent / "nsmart_accounts.json"
+LOGIN_USERNAME = "NSMART007"
+
+
+def _hash_password(password, salt):
+    return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+
+
+def _load_local_auth():
+    if not AUTH_FILE.exists():
+        return None
+    try:
+        with open(AUTH_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _save_local_auth(password):
+    salt = secrets.token_hex(16)
+    payload = {
+        "username": LOGIN_USERNAME,
+        "salt": salt,
+        "password_hash": _hash_password(password, salt)
+    }
+    with open(AUTH_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
+def _load_accounts():
+    if not ACCOUNTS_FILE.exists():
+        return {}
+    try:
+        with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_accounts(accounts):
+    with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(accounts, f, indent=2)
+
+
+def _create_account(username, password, full_name="", email="", role="USER"):
+    accounts = _load_accounts()
+    username = str(username).strip().upper()
+    if not username:
+        return False, "Username is required."
+    if username in accounts or username == LOGIN_USERNAME:
+        return False, "This username already exists."
+    if len(password) < 8:
+        return False, "Password must contain at least 8 characters."
+    salt = secrets.token_hex(16)
+    accounts[username] = {
+        "username": username,
+        "full_name": str(full_name).strip(),
+        "email": str(email).strip(),
+        "role": role,
+        "active": True,
+        "salt": salt,
+        "password_hash": _hash_password(password, salt),
+    }
+    _save_accounts(accounts)
+    return True, "Account created successfully."
+
+
+def _check_user_account(username, password):
+    account = _load_accounts().get(str(username).strip().upper())
+    if not account or not account.get("active", True):
+        return None
+    actual = _hash_password(str(password), account.get("salt", ""))
+    return account if hmac.compare_digest(actual, account.get("password_hash", "")) else None
+
+
+def _change_current_user_password(current_password, new_password):
+    username = str(st.session_state.get("nsmart_login_user", "")).strip().upper()
+    if len(new_password) < 8:
+        return False, "New password must contain at least 8 characters."
+
+    # Administrator password.
+    if username == LOGIN_USERNAME:
+        try:
+            secret_user = st.secrets.get("auth", {}).get("username")
+            secret_password = st.secrets.get("auth", {}).get("password")
+        except Exception:
+            secret_user = secret_password = None
+
+        if secret_user and secret_password:
+            if not hmac.compare_digest(str(current_password), str(secret_password)):
+                return False, "Current password is incorrect."
+            return False, "Cloud secret login is active. Change the password in Streamlit secrets for deployment."
+
+        auth = _load_local_auth()
+        if not auth:
+            return False, "Administrator login data was not found."
+
+        actual = _hash_password(str(current_password), auth.get("salt", ""))
+        if not hmac.compare_digest(actual, auth.get("password_hash", "")):
+            return False, "Current password is incorrect."
+
+        _save_local_auth(new_password)
+        return True, "Password changed successfully."
+
+    # Approved user password.
+    accounts = _load_accounts()
+    account = accounts.get(username)
+    if not account:
+        return False, "Account was not found."
+
+    actual = _hash_password(str(current_password), account.get("salt", ""))
+    if not hmac.compare_digest(actual, account.get("password_hash", "")):
+        return False, "Current password is incorrect."
+
+    salt = secrets.token_hex(16)
+    account["salt"] = salt
+    account["password_hash"] = _hash_password(str(new_password), salt)
+    accounts[username] = account
+    _save_accounts(accounts)
+    return True, "Password changed successfully."
+
+
+def _is_admin():
+    return str(st.session_state.get("nsmart_login_user", "")).upper() == LOGIN_USERNAME
+
+
+def _check_login(username, password):
+    try:
+        secret_user = st.secrets.get("auth", {}).get("username")
+        secret_password = st.secrets.get("auth", {}).get("password")
+    except Exception:
+        secret_user = secret_password = None
+
+    if secret_user and secret_password:
+        if hmac.compare_digest(str(username), str(secret_user)) and hmac.compare_digest(str(password), str(secret_password)):
+            return {"username": str(secret_user), "role": "ADMIN", "full_name": "Administrator"}
+
+    auth = _load_local_auth()
+    if auth and hmac.compare_digest(str(username).strip().upper(), LOGIN_USERNAME):
+        actual = _hash_password(str(password), auth.get("salt", ""))
+        if hmac.compare_digest(actual, auth.get("password_hash", "")):
+            return {"username": LOGIN_USERNAME, "role": "ADMIN", "full_name": "Administrator"}
+
+    return _check_user_account(username, password)
+
+
+# =========================================================
+# PERSISTENT LOGIN TOKEN
+# =========================================================
+# Streamlit session_state is lost on browser refresh/new tabs. A signed,
+# time-limited token in the URL keeps the same authenticated browser session
+# logged in across refreshes and sheets without removing the login system.
+AUTH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30
+
+
+def _auth_token_secret():
+    auth = _load_local_auth()
+    base = (
+        str(auth.get("password_hash", ""))
+        if auth else ""
+    )
+    if not base:
+        base = LOGIN_USERNAME + "|NSMART"
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()
+
+
+def _make_auth_token(username):
+    expiry = int(time.time()) + AUTH_TOKEN_TTL_SECONDS
+    payload = f"{str(username).upper()}|{expiry}"
+    signature = hmac.new(
+        _auth_token_secret().encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    raw = f"{payload}|{signature}".encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
+
+
+def _read_auth_token(token):
+    try:
+        token = str(token or "").strip()
+        if not token:
+            return None
+        padded = token + ("=" * (-len(token) % 4))
+        raw = base64.urlsafe_b64decode(
+            padded.encode("utf-8")
+        ).decode("utf-8")
+        username, expiry_text, signature = raw.split("|", 2)
+        expiry = int(expiry_text)
+        payload = f"{username}|{expiry}"
+        expected = hmac.new(
+            _auth_token_secret().encode("utf-8"),
+            payload.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        if (
+            expiry >= int(time.time())
+            and hmac.compare_digest(signature, expected)
+        ):
+            return username
+    except Exception:
+        pass
+    return None
+
+
+def _current_auth_token():
+    token = st.session_state.get("nsmart_auth_token", "")
+    if token:
+        return token
+    return str(st.query_params.get("auth", "")).strip()
+
+
+def show_login_screen():
+    st.markdown(
+        """
+        <style>
+        /* LOGIN PAGE: compact, top-aligned, no empty white rounded rectangle */
+        [data-testid="stAppViewContainer"] .main .block-container {
+            padding-top: 0.35rem !important;
+        }
+        .nsmart-login-shell {
+            width: 100%;
+            display: block;
+            padding: 0.35rem 0 0.75rem;
+            margin: 0;
+        }
+        .nsmart-login-card {
+            width: min(100%, 560px);
+            margin: 0 auto;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0.35rem 0.8rem 0.8rem;
+            box-shadow: none;
+        }
+        .nsmart-login-brand {
+            text-align: center;
+            margin: 0 0 0.25rem;
+        }
+        .nsmart-login-brand h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 850;
+            letter-spacing: -0.04em;
+            color: #0f172a;
+        }
+        .nsmart-login-brand .n-red { color: #dc2626; }
+        .nsmart-login-brand p {
+            margin: 0.2rem 0 0;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: #64748b;
+        }
+        .nsmart-login-line {
+            width: 52px;
+            height: 3px;
+            border-radius: 999px;
+            margin: 0.7rem auto 0.8rem;
+            background: linear-gradient(90deg, #dc2626, #2563eb);
+        }
+        .nsmart-login-caption {
+            text-align:center;
+            color:#475569;
+            margin:0 0 0.8rem;
+            font-size:0.88rem;
+        }
+        .nsmart-login-footer {
+            text-align:center;
+            color:#94a3b8;
+            font-size:0.75rem;
+            margin-top:0.7rem;
+        }
+        .nsmart-login-action {
+            text-align:center;
+            margin-top:0.45rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown('<div class="nsmart-login-shell"><div class="nsmart-login-card">', unsafe_allow_html=True)
+    logo_path = Path(__file__).parent / "LOGO.png"
+    if logo_path.exists():
+        logo_col1, logo_col2, logo_col3 = st.columns([1, 1.25, 1])
+        with logo_col2:
+            st.image(str(logo_path), use_container_width=True)
+    else:
+        st.warning("LOGO.png was not found. Keep LOGO.png in the same folder as app-final.py.")
+
+
+    # First run: allow the owner to create the local password.
+    has_secret_auth = False
+    try:
+        has_secret_auth = bool(
+            st.secrets.get("auth", {}).get("username")
+            and st.secrets.get("auth", {}).get("password")
+        )
+    except Exception:
+        has_secret_auth = False
+
+    if not has_secret_auth and not AUTH_FILE.exists():
+        st.info("🔐 First-time setup: create your private administrator password.")
+        with st.form("nsmart_first_setup", clear_on_submit=False):
+            username = st.text_input("Administrator Username", value=LOGIN_USERNAME, disabled=True)
+            password = st.text_input("Create Password", type="password")
+            confirm = st.text_input("Confirm Password", type="password")
+            setup = st.form_submit_button("CREATE SECURE LOGIN", use_container_width=True, type="primary")
+
+        if setup:
+            if len(password) < 8:
+                st.error("Password must contain at least 8 characters.")
+            elif password != confirm:
+                st.error("Passwords do not match.")
+            else:
+                _save_local_auth(password)
+                st.success("Secure login created successfully. Please log in now.")
+                st.rerun()
+
+        st.markdown('<div class="nsmart-login-footer">N-SMART • Private Administration Access</div></div></div>', unsafe_allow_html=True)
+        st.stop()
+
+    login_left, login_center, login_right = st.columns([1.5, 1, 1.5])
+    with login_center:
+        with st.form("nsmart_login_form", clear_on_submit=False):
+            username = st.text_input("Username", placeholder="Enter your username")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            login = st.form_submit_button("🔐 LOGIN TO N-SMART", use_container_width=True, type="primary")
+
+    if login:
+        account = _check_login(username, password)
+        if account:
+            st.session_state.nsmart_authenticated = True
+            st.session_state.nsmart_login_user = account["username"]
+            st.session_state.nsmart_login_role = account.get("role", "USER")
+            st.session_state.nsmart_login_name = account.get("full_name", "")
+            st.session_state.nsmart_auth_token = _make_auth_token(
+                account["username"]
+            )
+            st.query_params["auth"] = (
+                st.session_state.nsmart_auth_token
+            )
+            st.rerun()
+        else:
+            st.error("Incorrect username or password, or your account is not approved.")
+
+    st.markdown('<div class="nsmart-login-footer">Protected system • Authorized access only</div></div></div>', unsafe_allow_html=True)
+
+
+if "nsmart_authenticated" not in st.session_state:
+    st.session_state.nsmart_authenticated = False
+
+# Restore login after browser refresh or when opening another sheet/tab.
+_url_auth_token = str(
+    st.query_params.get("auth", "")
+).strip()
+_token_user = _read_auth_token(_url_auth_token)
+
+if _token_user:
+    st.session_state.nsmart_authenticated = True
+    st.session_state.nsmart_login_user = _token_user
+    st.session_state.nsmart_auth_token = _url_auth_token
+    if "nsmart_login_role" not in st.session_state:
+        st.session_state.nsmart_login_role = "ADMIN" if _token_user == LOGIN_USERNAME else "USER"
+
+
+# =========================================================
+# DASHBOARD SAVED-SHEET OPEN ACCESS
+# =========================================================
+# Saved sheets opened from Dashboard/Search open in a new tab. A new browser
+# tab has a fresh Streamlit session, so it would normally show the login page
+# again. Only links explicitly created by the Dashboard/Search use
+# dashboard_open=1. For those links, allow direct viewing only when the
+# requested sheet exists and is already marked as saved.
+_dashboard_sheet_request = str(
+    st.query_params.get("sheet", "")
+).strip().upper()
+
+_dashboard_open_request = str(
+    st.query_params.get("dashboard_open", "")
+).strip()
+
+_dashboard_saved_sheet_access = False
+
+if (
+    _dashboard_open_request == "1"
+    and _dashboard_sheet_request
+):
+    try:
+        _dashboard_data_file = "bhu_bharathi_data.json"
+        if os.path.exists(_dashboard_data_file):
+            with open(
+                _dashboard_data_file,
+                "r",
+                encoding="utf-8"
+            ) as _dashboard_file:
+                _dashboard_database = json.load(_dashboard_file)
+
+            _dashboard_sheet_data = (
+                _dashboard_database.get(
+                    _dashboard_sheet_request,
+                    {}
+                )
+            )
+
+            _dashboard_saved_sheet_access = bool(
+                _dashboard_sheet_data.get(
+                    "saved",
+                    False
+                )
+            )
+    except Exception:
+        _dashboard_saved_sheet_access = False
+
+
+if (
+    not st.session_state.nsmart_authenticated
+    and not _dashboard_saved_sheet_access
+):
+    show_login_screen()
+    st.stop()
 
 
 DATA_FILE = "bhu_bharathi_data.json"
 
 PDF_FOLDER = "BHU_BHARATHI_PDF_FILES"
+
+# Logo is loaded from the same folder as this Python file.
+# Supports the normal LOGO.png name and common Windows-renamed variants.
+APP_FOLDER = Path(__file__).parent
+LOGO_PATH = None
+for _logo_name in ("LOGO.png", "logo.png", "LOGO(1).png"):
+    _candidate = APP_FOLDER / _logo_name
+    if _candidate.exists():
+        LOGO_PATH = _candidate
+        break
 
 
 os.makedirs(
@@ -69,34 +549,91 @@ st.markdown(
     }
 
     .app-title {
-        text-align: center;
+        text-align: left;
         font-size: 30px;
         font-weight: 800;
-        margin-bottom: 5px;
+        margin: 0;
+        color: #ffffff;
+    }
+
+    .app-subtitle {
+        text-align: left;
+        font-size: 14px;
+        font-weight: 500;
+        color: #bae6fd;
+        margin-top: 4px;
+    }
+
+    .app-header {
+        background: linear-gradient(135deg, #020617, #0b1736, #1e3a8a);
+        border: 1px solid #26364d;
+        border-radius: 20px;
+        padding: 25px 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 12px 35px rgba(0,0,0,.30);
     }
 
     .deed-title {
         text-align: center;
         font-size: 27px;
         font-weight: 800;
-        margin-top: 2px;
-        margin-bottom: 8px;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        color: #ffffff;
     }
 
     .section-title {
-        text-align: center;
-        font-size: 21px;
-        font-weight: 750;
-        margin-top: 4px;
-        margin-bottom: 6px;
+        text-align: left;
+        font-size: 18px;
+        font-weight: 800;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        padding: 12px 16px;
+        color: #2563eb;
+        background: #ffffff;
+        border-left: 5px solid #38bdf8;
+        border-radius: 10px;
+        box-shadow: 0 5px 16px rgba(0,0,0,.20);
     }
 
     .family-title {
-        text-align: center;
-        font-size: 17px;
-        font-weight: 700;
-        margin-top: 7px;
-        margin-bottom: 4px;
+        text-align: left;
+        font-size: 16px;
+        font-weight: 750;
+        margin-top: 14px;
+        margin-bottom: 8px;
+        padding: 8px 12px;
+        color: #7dd3fc;
+        border-left: 3px solid #38bdf8;
+        background: rgba(30,58,138,.18);
+        border-radius: 7px;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(145deg, #111c2f, #0d1728);
+        border: 1px solid #26364d;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 7px 20px rgba(0,0,0,.25);
+    }
+
+    .dashboard-label {
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 650;
+    }
+
+    .dashboard-value {
+        color: #7dd3fc;
+        font-size: 28px;
+        font-weight: 850;
+        margin-top: 4px;
+    }
+
+    .dashboard-note {
+        color: #cbd5e1;
+        font-size: 12px;
+        margin-top: 3px;
     }
 
     .sheet-wrapper {
@@ -161,6 +698,10 @@ def empty_file():
         "first_name": "",
 
         "first_age": 0,
+
+        "first_dod": "",
+
+        "successor_count": 1,
 
         "first_relation": "S/o",
 
@@ -514,31 +1055,41 @@ def next_sheet():
 
 
 # =========================================================
-# CURRENT SHEET
+# CURRENT SHEET / DIRECT SHEET URL
 # =========================================================
 
-if "current_sheet" not in (
-    st.session_state
-):
+# A saved sheet opened in a new tab uses a URL like ?sheet=NS-0001.
+# A new empty sheet opened in another tab uses ?new_sheet=1.
+new_sheet_request = str(st.query_params.get("new_sheet", "")).strip()
+if new_sheet_request == "1":
+    # This code runs only in the newly opened tab.
+    # Reload the shared database so we use the latest sheet number.
+    st.session_state.database = load_database()
+    new_sheet_name = next_sheet()
+    if new_sheet_name not in st.session_state.database:
+        st.session_state.database[new_sheet_name] = empty_file()
+        save_database()
+    st.session_state.current_sheet = new_sheet_name
+    # Change the URL to the real sheet so refreshing does not create another one.
+    st.query_params.clear()
+    st.query_params["sheet"] = new_sheet_name
 
-    st.session_state.current_sheet = (
-        next_sheet()
-    )
-
+requested_sheet = st.query_params.get("sheet", "")
+if isinstance(requested_sheet, list):
+    requested_sheet = requested_sheet[0] if requested_sheet else ""
+requested_sheet = str(requested_sheet).strip().upper()
 
 if (
-    st.session_state.current_sheet
-
-    not in
-
-    st.session_state.database
+    requested_sheet
+    and requested_sheet in st.session_state.database
 ):
+    # Restores both saved and in-progress sheets after refresh.
+    st.session_state.current_sheet = requested_sheet
+elif "current_sheet" not in st.session_state:
+    st.session_state.current_sheet = next_sheet()
 
-    st.session_state.database[
-        st.session_state.current_sheet
-    ] = empty_file()
-
-
+if st.session_state.current_sheet not in st.session_state.database:
+    st.session_state.database[st.session_state.current_sheet] = empty_file()
     save_database()
 
 
@@ -800,6 +1351,8 @@ def collect_data():
 
         "first_age",
 
+        "first_dod",
+
         "first_relation",
 
         "first_relation_name",
@@ -938,6 +1491,8 @@ def collect_data():
 
         "challan_amount",
 
+        "charges",
+
         "booking_status",
 
         "notes"
@@ -961,6 +1516,31 @@ def collect_data():
                     widget_key
                 ]
             )
+
+
+    # Save dynamically added SUCCESSION successors.
+    successor_count_key = f"{sheet}_successor_count"
+    if successor_count_key in st.session_state:
+        data["successor_count"] = st.session_state[successor_count_key]
+
+    successor_prefix = f"{sheet}_successor_"
+    for widget_key, widget_value in st.session_state.items():
+        if widget_key.startswith(successor_prefix):
+            data[widget_key[len(f"{sheet}_"):]] = widget_value
+
+    dod_key = (
+        f"{sheet}_first_dod"
+    )
+
+    if dod_key in (
+        st.session_state
+    ):
+
+        data["first_dod"] = str(
+            st.session_state[
+                dod_key
+            ]
+        )
 
 
     entry_key = (
@@ -1080,12 +1660,45 @@ def collect_data():
             st.session_state
         ):
 
-            payment["amount"] = (
+            payment["amount"] = float(
                 st.session_state[
                     key
+                ] or 0.0
+            )
+
+        mode_key = (
+            f"{sheet}_"
+            f"payment_mode_"
+            f"{payment_id}"
+        )
+
+        if mode_key in (
+            st.session_state
+        ):
+
+            payment["payment_mode"] = (
+                st.session_state[
+                    mode_key
                 ]
             )
 
+
+    # Save SUCCESSION successor-wise land allocations.
+    if data.get("document_type") == "SUCCESSION":
+        successor_count = int(data.get("successor_count", 1) or 1)
+        successor_lands = data.setdefault("successor_lands", {})
+        for successor_number in range(1, successor_count + 1):
+            land_key = f"successor_{successor_number}"
+            allocations = successor_lands.setdefault(land_key, [])
+            for allocation in allocations:
+                allocation_id = allocation.get("id")
+                for field in ["survey_number", "extent", "north", "south", "east", "west"]:
+                    widget_key = f"{sheet}_{land_key}_land_{allocation_id}_{field}"
+                    if widget_key in st.session_state:
+                        value = st.session_state[widget_key]
+                        if field == "extent":
+                            value = clean_extent(value)
+                        allocation[field] = value
 
     save_database()
 
@@ -2464,6 +3077,19 @@ def create_pdf(
 
     )
 
+    charges = float(
+
+        data.get(
+
+            "charges",
+
+            0
+
+        )
+
+    )
+
+    total_payable = challan + charges
 
     payment_rows = [
 
@@ -2473,17 +3099,50 @@ def create_pdf(
 
             challan,
 
+            "Charges",
+
+            charges,
+
+            "Total Payable",
+
+            total_payable
+
+        ],
+
+        [
+
             "Total Paid",
 
             total_paid,
 
             "Balance",
 
-            challan - total_paid
+            total_payable - total_paid,
+
+            "",
+
+            "",
+
+            "",
+
+            ""
 
         ],
 
-        [
+        # Individual payment entries, including their selected payment mode.
+    ]
+
+    for _payment in data.get("payments", []):
+        payment_rows.append([
+            f"Amount Paid {_payment.get('id', '')}",
+            float(_payment.get("amount", 0) or 0),
+            "Payment Mode",
+            pdf_text(_payment.get("payment_mode", "CASH")),
+            "",
+            ""
+        ])
+
+    payment_rows.append([
 
             "Slot Date",
 
@@ -2529,7 +3188,7 @@ def create_pdf(
 
         ]
 
-    ]
+    )
 
 
     payment_table = Table(
@@ -2653,21 +3312,27 @@ def create_pdf(
 # TITLE
 # =========================================================
 
-st.markdown(
+header_logo_col, header_text_col = st.columns([1, 6])
 
-    """
+with header_logo_col:
+    if LOGO_PATH:
+        st.image(str(LOGO_PATH), width=110)
+    else:
+        st.markdown("<div style='font-size:42px; padding-top:10px;'>🏛️</div>", unsafe_allow_html=True)
 
-    <div class="app-title">
-
-    📁 BHU BHARATHI LAND FILES
-
-    </div>
-
-    """,
-
-    unsafe_allow_html=True
-
-)
+with header_text_col:
+    st.markdown(
+        f"""
+        <div class="app-header">
+            <div class="app-title">SLOT BOOKING DETAILS</div>
+            <div class="app-subtitle">
+                Digital Land Document Management System
+                &nbsp;•&nbsp; Current File: {st.session_state.current_sheet}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # =========================================================
@@ -2685,6 +3350,329 @@ data = (
         sheet
     ]
 )
+
+# =========================================================
+# PROFESSIONAL SIDEBAR + NAVIGATION
+# =========================================================
+
+saved_files = [
+    item for item in st.session_state.database.values()
+    if item.get("saved", False)
+]
+
+pending_files = sum(
+    1 for item in saved_files
+    if item.get("booking_status", "STATUS PENDING") == "STATUS PENDING"
+)
+
+completed_files = sum(
+    1 for item in saved_files
+    if item.get("booking_status", "STATUS PENDING") == "REG. COMPLETED"
+)
+
+with st.sidebar:
+    if LOGO_PATH:
+        st.image(str(LOGO_PATH), width=160)
+    else:
+        st.markdown(
+            """
+            <div style="text-align:center; padding:8px 0 18px;">
+                <div style="font-size:30px;">🏛️</div>
+                <div style="font-size:20px; font-weight:850; color:#ffffff;">
+                    N-SMART
+                </div>
+                <div style="font-size:11px; color:#7dd3fc; margin-top:3px;">
+                    ONLINE SERVICES
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    navigation = st.radio(
+        "NAVIGATION",
+        ["📄 Document Entry", "📊 Dashboard", "👤 My Account"],
+        key="main_navigation"
+    )
+
+    st.markdown(
+        f"""<div style="padding:0.45rem 0.2rem 0.1rem;">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;">SIGNED IN AS</div>
+        <div style="font-size:15px;color:#ffffff;font-weight:800;">{st.session_state.get("nsmart_login_user", "")}</div>
+        <div style="font-size:10px;color:#7dd3fc;font-weight:700;">{st.session_state.get("nsmart_login_role", "USER")}</div>
+        </div>""", unsafe_allow_html=True
+    )
+    # Safe logout: ask for confirmation before ending the session.
+    if "nsmart_confirm_logout" not in st.session_state:
+        st.session_state.nsmart_confirm_logout = False
+
+    if not st.session_state.nsmart_confirm_logout:
+        if st.button("🔒 LOG OUT", use_container_width=True, key="nsmart_logout"):
+            st.session_state.nsmart_confirm_logout = True
+            st.rerun()
+    else:
+        st.warning("Are you sure you want to log out?")
+        logout_yes, logout_no = st.columns(2)
+
+        if logout_yes.button("YES, LOG OUT", use_container_width=True, key="confirm_logout_yes"):
+            st.session_state.nsmart_authenticated = False
+            st.session_state.nsmart_confirm_logout = False
+            for _key in ("nsmart_login_user", "nsmart_login_role", "nsmart_login_name"):
+                st.session_state.pop(_key, None)
+            st.rerun()
+
+        if logout_no.button("NO, STAY LOGGED IN", use_container_width=True, key="confirm_logout_no"):
+            st.session_state.nsmart_confirm_logout = False
+            st.rerun()
+
+    st.divider()
+
+    st.markdown(
+        f"""
+        <div style="padding:8px 4px;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;">
+                CURRENT SHEET
+            </div>
+            <div style="font-size:24px;color:#7dd3fc;font-weight:850;">
+                {sheet}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Opens a brand-new empty sheet in a separate browser tab.
+    # The current sheet and its current data remain untouched.
+    st.markdown(
+        f"""
+        <a href="./?new_sheet=1&auth={_current_auth_token()}" target="_blank" rel="noopener noreferrer"
+           style="display:block; text-align:center; padding:0.55rem 0.8rem;
+                  border-radius:0.5rem; text-decoration:none; font-weight:700;
+                  background:#1f77b4; color:white; margin-bottom:0.5rem;">
+            ➕ NEW EMPTY SHEET ↗
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        f"""
+        <div style="margin-top:18px;padding:14px;border:1px solid #26364d;
+                    border-radius:12px;background:#111c2f;">
+            <div style="font-size:11px;color:#94a3b8;">FILES</div>
+            <div style="font-size:22px;font-weight:850;color:#7dd3fc;">
+                {len(saved_files)}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:8px;">
+                Pending: <b style="color:#fbbf24;">{pending_files}</b>
+                &nbsp;&nbsp; Completed:
+                <b style="color:#86efac;">{completed_files}</b>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# =========================================================
+# MY ACCOUNT CENTRE
+# =========================================================
+
+if navigation == "👤 My Account":
+    st.markdown("""
+        <div class="app-header">
+            <div class="app-title">MY ACCOUNT</div>
+            <div class="app-subtitle">Manage your N-SMART account and authorized access</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    user = st.session_state.get("nsmart_login_user", "")
+    role = st.session_state.get("nsmart_login_role", "USER")
+    name = st.session_state.get("nsmart_login_name", "") or "N-SMART User"
+
+    st.markdown(
+        f"""
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:0.3rem 0 0.8rem;">
+            <div style="padding:0.45rem 0.7rem;border:1px solid #e2e8f0;border-radius:10px;font-size:0.82rem;"><b>ACCOUNT:</b> {user}</div>
+            <div style="padding:0.45rem 0.7rem;border:1px solid #e2e8f0;border-radius:10px;font-size:0.82rem;"><b>ROLE:</b> {role}</div>
+            <div style="padding:0.45rem 0.7rem;border:1px solid #e2e8f0;border-radius:10px;font-size:0.82rem;"><b>ACCESS:</b> APPROVED</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("#### 👤 My Profile")
+    st.info(f"**Name:** {name}  \n**Username:** {user}  \n**Role:** {role}")
+
+    st.markdown("#### 🔐 Security")
+    st.info("Public self-sign-up is disabled. Accounts can only be created and approved by the N-SMART administrator.")
+
+    st.markdown("#### 🔑 Change Password")
+    with st.expander("Change my password", expanded=False):
+        with st.form("change_password_form", clear_on_submit=True):
+            current_password = st.text_input("Current Password", type="password")
+            new_password = st.text_input("New Password", type="password")
+            confirm_new_password = st.text_input("Confirm New Password", type="password")
+            change_password = st.form_submit_button("UPDATE PASSWORD", type="primary")
+
+        if change_password:
+            if not current_password or not new_password or not confirm_new_password:
+                st.error("Please complete all password fields.")
+            elif new_password != confirm_new_password:
+                st.error("New password and confirmation do not match.")
+            elif new_password == current_password:
+                st.error("Please choose a different new password.")
+            else:
+                ok, message = _change_current_user_password(current_password, new_password)
+                if ok:
+                    st.success(message + " Use your new password the next time you log in.")
+                else:
+                    st.error(message)
+
+    if _is_admin():
+        st.markdown("#### ➕ Create & Approve New User")
+        with st.form("create_nsmart_user", clear_on_submit=True):
+            full_name = st.text_input("Full Name")
+            new_username = st.text_input("Username")
+            new_email = st.text_input("Email (optional)")
+            new_password = st.text_input("Temporary Password", type="password")
+            create_user = st.form_submit_button("CREATE APPROVED ACCOUNT", type="primary")
+
+        if create_user:
+            ok, message = _create_account(new_username, new_password, full_name, new_email)
+            st.success(message) if ok else st.error(message)
+
+        accounts = _load_accounts()
+        st.markdown("#### 👥 Approved Accounts")
+        if accounts:
+            rows = [{
+                "Username": uname,
+                "Name": acc.get("full_name", ""),
+                "Email": acc.get("email", ""),
+                "Role": acc.get("role", "USER"),
+                "Status": "ACTIVE" if acc.get("active", True) else "DISABLED"
+            } for uname, acc in accounts.items()]
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+
+            selected = st.selectbox("Select account to manage", list(accounts.keys()))
+            a1, a2 = st.columns(2)
+            if a1.button("🚫 DISABLE ACCESS", use_container_width=True):
+                accounts[selected]["active"] = False
+                _save_accounts(accounts)
+                st.rerun()
+            if a2.button("✅ ENABLE ACCESS", use_container_width=True):
+                accounts[selected]["active"] = True
+                _save_accounts(accounts)
+                st.rerun()
+        else:
+            st.info("No additional approved users yet.")
+
+    st.stop()
+
+
+# =========================================================
+# DASHBOARD VIEW
+# =========================================================
+
+if navigation == "📊 Dashboard":
+    st.markdown(
+        """
+        <div class="app-header">
+            <div class="app-title">🏛️ BHU BHARATHI</div>
+            <div class="app-subtitle">Land Document Management Dashboard</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="section-title">📊 SYSTEM OVERVIEW</div>',
+        unsafe_allow_html=True
+    )
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+
+    with metric_1:
+        st.markdown(
+            f'''<div class="dashboard-card">
+                <div class="dashboard-label">TOTAL SAVED FILES</div>
+                <div class="dashboard-value">{len(saved_files)}</div>
+                <div class="dashboard-note">All registered sheets</div>
+            </div>''',
+            unsafe_allow_html=True
+        )
+
+    with metric_2:
+        st.markdown(
+            f'''<div class="dashboard-card">
+                <div class="dashboard-label">PENDING</div>
+                <div class="dashboard-value">{pending_files}</div>
+                <div class="dashboard-note">Registration pending</div>
+            </div>''',
+            unsafe_allow_html=True
+        )
+
+    with metric_3:
+        st.markdown(
+            f'''<div class="dashboard-card">
+                <div class="dashboard-label">COMPLETED</div>
+                <div class="dashboard-value">{completed_files}</div>
+                <div class="dashboard-note">Registration completed</div>
+            </div>''',
+            unsafe_allow_html=True
+        )
+
+    with metric_4:
+        total_files = len(st.session_state.database)
+        st.markdown(
+            f'''<div class="dashboard-card">
+                <div class="dashboard-label">TOTAL SHEETS</div>
+                <div class="dashboard-value">{total_files}</div>
+                <div class="dashboard-note">Saved + active sheets</div>
+            </div>''',
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        '<div class="section-title">📁 SAVED SHEETS</div>',
+        unsafe_allow_html=True
+    )
+
+    saved_sheet_items = sorted(
+        [(name, item) for name, item in st.session_state.database.items()
+         if item.get("saved", False)],
+        key=lambda item: sheet_value(item[0])
+    )
+
+    if saved_sheet_items:
+        for row_start in range(0, len(saved_sheet_items), 4):
+            row_items = saved_sheet_items[row_start:row_start + 4]
+            card_columns = st.columns(4)
+            for card_index, card_column in enumerate(card_columns):
+                with card_column:
+                    if card_index < len(row_items):
+                        saved_sheet_name, saved_sheet_data = row_items[card_index]
+                        document_type = saved_sheet_data.get("document_type", "SALE")
+                        primary_name = saved_sheet_data.get("first_name", "") or "—"
+                        st.markdown(
+                            f"""
+                            <a href="?sheet={saved_sheet_name}&dashboard_open=1&auth={_current_auth_token()}" target="_blank"
+                               style="text-decoration:none; display:block;">
+                              <div style="min-height:145px; padding:16px; border:1px solid #26364d;
+                                          border-radius:14px; background:#111c2f; margin-bottom:12px; cursor:pointer;">
+                                <div style="font-size:28px;">📄</div>
+                                <div style="font-size:20px; font-weight:850; color:#7dd3fc; margin-top:5px;">{saved_sheet_name}</div>
+                                <div style="font-size:11px; color:#94a3b8; margin-top:5px;">{document_type}</div>
+                                <div style="font-size:12px; color:#ffffff; margin-top:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{primary_name}</div>
+                                <div style="font-size:11px; color:#86efac; margin-top:10px; font-weight:700;">OPEN ↗</div>
+                              </div>
+                            </a>
+                            """,
+                            unsafe_allow_html=True
+                        )
+    else:
+        st.info("No saved sheets yet. Saved files will appear here.")
+
+    st.stop()
 
 # =========================================================
 # SHEET NUMBER — TOP LEFT WITHOUT RECTANGLE
@@ -2818,7 +3806,9 @@ with date_column:
 
             "entry_date"
 
-        )
+        ),
+
+        format="DD/MM/YYYY"
 
     )
 
@@ -2905,27 +3895,14 @@ if search_text.strip():
 
             with result_button:
 
-                if st.button(
-
-                    "📂 OPEN",
-
-                    key=(
-
-                        f"open_"
-
-                        f"{result}"
-
-                    ),
-
-                    use_container_width=True
-
-                ):
-
-                    open_sheet(
-                        result
-                    )
-
-                    st.rerun()
+                # Opens the selected saved sheet in a new browser tab.
+                st.markdown(
+                    f"""<a href="?sheet={result}&dashboard_open=1&auth={_current_auth_token()}" target="_blank"
+                    style="display:block; text-align:center; padding:0.55rem 0.7rem;
+                    border-radius:8px; background:#1d4ed8; color:white;
+                    text-decoration:none; font-weight:700;">📂 OPEN ↗</a>""",
+                    unsafe_allow_html=True
+                )
 
 
 # =========================================================
@@ -3604,169 +4581,154 @@ def person_form(
 
 
 
-    name_column, age_column = (
+    # =====================================================
+    # NAME + AGE / DOD
+    # =====================================================
 
-        st.columns(2)
-
-    )
-
-
-    with name_column:
-
-        st.text_input(
-
-            f"{person_title.title()} Name",
-
-            value=(
-
-                data.get(
-
-                    f"{prefix}_name",
-
-                    ""
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_name"
-
-            )
-
-        )
-
-
-    with age_column:
-
-        st.number_input(
-
-            "Age",
-
-            min_value=0,
-
-            max_value=120,
-
-            value=int(
-
-                data.get(
-
-                    f"{prefix}_age",
-
-                    0
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_age"
-
-            )
-
-        )
-
-
-    relation_options = [
-
-        "S/o",
-
-        "D/o",
-
-        "W/o"
-
-    ]
-
-
-    saved_relation = (
-
-        data.get(
-
-            f"{prefix}_relation",
-
-            "S/o"
-
-        )
-
-    )
-
-
-    if saved_relation not in (
-        relation_options
+    if (
+        selected_document == "SUCCESSION"
+        and prefix == "first"
     ):
 
-        saved_relation = "S/o"
+        # SUCCESSION — PREDECESSOR
+        st.text_input("PPB No.", value=data.get("first_ppb", ""), key=f"{sheet}_first_ppb")
 
+        name_column, age_column, dod_column = st.columns(3)
+        with name_column:
+            st.text_input("Predecessor Name", value=data.get("first_name", ""), key=f"{sheet}_first_name")
+        with age_column:
+            st.number_input("Age", min_value=0, max_value=120, value=int(data.get("first_age", 0)), key=f"{sheet}_first_age")
+        with dod_column:
+            saved_dod = data.get("first_dod", "")
+            try:
+                dod_value = date.fromisoformat(str(saved_dod))
+            except (ValueError, TypeError):
+                dod_value = date.today()
+            st.date_input("DOD", value=dod_value, min_value=date(1, 1, 1), max_value=date(9999, 12, 31), key=f"{sheet}_first_dod")
 
-    relation_column, relation_name_column = (
+    else:
 
-        st.columns(2)
+        name_column, age_column = st.columns(2)
 
-    )
-
-
-    with relation_column:
-
-        st.selectbox(
-
-            "S/D/W/o",
-
-            relation_options,
-
-            index=(
-
-                relation_options.index(
-
-                    saved_relation
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_relation"
-
-            )
-
-        )
-
-
-    with relation_name_column:
-
-        st.text_input(
-
-            "Father / Mother / Spouse",
-
-            value=(
-
-                data.get(
-
-                    f"{prefix}_relation_name",
-
+        with name_column:
+            st.text_input(
+                f"{person_title.title()} Name",
+                value=data.get(
+                    f"{prefix}_name",
                     ""
+                ),
+                key=f"{sheet}_{prefix}_name"
+            )
 
-                )
+        with age_column:
+            st.number_input(
+                "Age",
+                min_value=0,
+                max_value=120,
+                value=int(
+                    data.get(
+                        f"{prefix}_age",
+                        0
+                    )
+                ),
+                key=f"{sheet}_{prefix}_age"
+            )
+    if not (selected_document == "SUCCESSION" and prefix == "first"):
 
-            ),
+        relation_options = [
 
-            key=(
+            "S/o",
 
-                f"{sheet}_"
+            "D/o",
 
-                f"{prefix}_relation_name"
+            "W/o"
+
+        ]
+
+
+        saved_relation = (
+
+            data.get(
+
+                f"{prefix}_relation",
+
+                "S/o"
 
             )
 
         )
+
+
+        if saved_relation not in (
+            relation_options
+        ):
+
+            saved_relation = "S/o"
+
+
+        relation_column, relation_name_column = (
+
+            st.columns(2)
+
+        )
+
+
+        with relation_column:
+
+            st.selectbox(
+
+                "S/D/W/o",
+
+                relation_options,
+
+                index=(
+
+                    relation_options.index(
+
+                        saved_relation
+
+                    )
+
+                ),
+
+                key=(
+
+                    f"{sheet}_"
+
+                    f"{prefix}_relation"
+
+                )
+
+            )
+
+
+        with relation_name_column:
+
+            st.text_input(
+
+                "Father / Mother / Spouse",
+
+                value=(
+
+                    data.get(
+
+                        f"{prefix}_relation_name",
+
+                        ""
+
+                    )
+
+                ),
+
+                key=(
+
+                    f"{sheet}_"
+
+                    f"{prefix}_relation_name"
+
+                )
+
+            )
 
 
     # =====================================================
@@ -4204,6 +5166,9 @@ def person_form(
     )
 
 
+    if selected_document == "SUCCESSION" and prefix == "first":
+        return
+
     # =====================================================
     # FAMILY MEMBER
     # =====================================================
@@ -4553,6 +5518,14 @@ def person_form(
 
 
 # =========================================================
+# SUCCESSION — SUCCESSOR COUNT
+# =========================================================
+if selected_document == "SUCCESSION":
+    successor_count_key = f"{sheet}_successor_count"
+    if successor_count_key not in st.session_state:
+        st.session_state[successor_count_key] = max(1, int(data.get("successor_count", 1)))
+
+# =========================================================
 # PERSON SPLIT VIEW
 # =========================================================
 
@@ -4613,6 +5586,161 @@ with second_column:
     )
 
 
+# =========================================================
+# SUCCESSION — SUCCESSOR-WISE LAND DETAILS
+# =========================================================
+def render_successor_land(successor_number):
+    """Render land details directly under one successor and return total guntas."""
+    land_key = f"successor_{successor_number}"
+    successor_lands = data.setdefault("successor_lands", {})
+    allocations = successor_lands.setdefault(land_key, [])
+
+    with st.container(border=True):
+        st.markdown(f"#### 🌾 LAND DETAILS — SUCCESSOR {successor_number}")
+
+        top_left, top_right = st.columns([3, 1])
+        with top_left:
+            if st.button("➕ ADD SURVEY", key=f"{sheet}_{land_key}_add_land", use_container_width=True):
+                collect_data()
+                existing_ids = [item.get("id", 0) for item in allocations]
+                new_id = max(existing_ids) + 1 if existing_ids else 1
+                allocations.append({"id": new_id, "survey_number": "", "extent": "", "north": "", "south": "", "east": "", "west": ""})
+                save_database()
+                st.rerun()
+        with top_right:
+            st.caption("Add land for this successor")
+
+        total_guntas = 0
+        for allocation in allocations.copy():
+            allocation_id = allocation.get("id")
+            with st.container(border=True):
+                survey_col, extent_col, delete_col = st.columns([1.5, 1.1, 0.45])
+                with survey_col:
+                    st.text_input("Survey No.", value=allocation.get("survey_number", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_survey_number")
+                with extent_col:
+                    allocation_extent = st.text_input("Extent", value=allocation.get("extent", ""), placeholder="1.1500", key=f"{sheet}_{land_key}_land_{allocation_id}_extent")
+                with delete_col:
+                    st.caption("Delete")
+                    if st.button("🗑️", key=f"{sheet}_{land_key}_delete_land_{allocation_id}", use_container_width=True):
+                        collect_data()
+                        successor_lands[land_key] = [item for item in allocations if item.get("id") != allocation_id]
+                        save_database()
+                        st.rerun()
+
+                north_col, south_col, east_col, west_col = st.columns(4)
+                with north_col:
+                    st.text_input("North", value=allocation.get("north", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_north")
+                with south_col:
+                    st.text_input("South", value=allocation.get("south", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_south")
+                with east_col:
+                    st.text_input("East", value=allocation.get("east", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_east")
+                with west_col:
+                    st.text_input("West", value=allocation.get("west", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_west")
+
+                cleaned_extent = clean_extent(allocation_extent)
+                converted_extent = extent_guntas(cleaned_extent)
+                if allocation_extent and converted_extent is None:
+                    st.error("Invalid extent. Example: 1.1500 (guntas 00–39).")
+                elif converted_extent is not None:
+                    total_guntas += converted_extent
+
+        total_acres = total_guntas // 40
+        remaining_guntas = total_guntas % 40
+        total_extent = f"{total_acres}.{remaining_guntas:02d}00"
+        total_col, _ = st.columns([1.2, 2.8])
+        total_widget_key = f"{sheet}_{land_key}_total_extent"
+        # This is a calculated field, so refresh its widget value on every rerun.
+        # Otherwise Streamlit keeps the old disabled value (often 0.0000).
+        st.session_state[total_widget_key] = total_extent
+        with total_col:
+            st.text_input("TOTAL EXTENT", value=total_extent, disabled=True, key=total_widget_key)
+
+    return total_guntas
+
+
+# =========================================================
+# SUCCESSION — ADDITIONAL SUCCESSORS + LINKED LAND
+# =========================================================
+def delete_successor(successor_number, successor_count):
+    delete_prefix = f"{sheet}_successor_{successor_number}_"
+    for key in list(st.session_state.keys()):
+        if key.startswith(delete_prefix):
+            del st.session_state[key]
+
+    for current_number in range(successor_number + 1, successor_count + 1):
+        old_prefix = f"{sheet}_successor_{current_number}_"
+        new_prefix = f"{sheet}_successor_{current_number - 1}_"
+        for key in list(st.session_state.keys()):
+            if key.startswith(old_prefix):
+                st.session_state[new_prefix + key[len(old_prefix):]] = st.session_state.pop(key)
+
+    for key in list(data.keys()):
+        if key.startswith(f"successor_{successor_number}_"):
+            del data[key]
+
+    for current_number in range(successor_number + 1, successor_count + 1):
+        old_prefix = f"successor_{current_number}_"
+        new_prefix = f"successor_{current_number - 1}_"
+        for key in list(data.keys()):
+            if key.startswith(old_prefix):
+                data[new_prefix + key[len(old_prefix):]] = data.pop(key)
+
+    successor_lands = data.setdefault("successor_lands", {})
+    successor_lands.pop(f"successor_{successor_number}", None)
+    for current_number in range(successor_number + 1, successor_count + 1):
+        old_land_key = f"successor_{current_number}"
+        new_land_key = f"successor_{current_number - 1}"
+        if old_land_key in successor_lands:
+            successor_lands[new_land_key] = successor_lands.pop(old_land_key)
+
+    new_count = max(1, successor_count - 1)
+    st.session_state[f"{sheet}_successor_count"] = new_count
+    data["successor_count"] = new_count
+
+
+if selected_document == "SUCCESSION":
+    successor_count = st.session_state.get(f"{sheet}_successor_count", 1)
+    all_successor_total_guntas = 0
+
+    # Successor 1 is the main right-side person. Its land stays directly with the succession section.
+    all_successor_total_guntas += render_successor_land(1)
+
+    # Additional successors are compact: two successor cards per row.
+    successor_numbers = list(range(2, successor_count + 1))
+    for row_start in range(0, len(successor_numbers), 2):
+        row_numbers = successor_numbers[row_start:row_start + 2]
+        row_columns = st.columns(len(row_numbers), gap="small")
+        for successor_number, successor_column in zip(row_numbers, row_columns):
+            with successor_column:
+                with st.container(border=True):
+                    title_col, delete_col = st.columns([5, 1])
+                    with title_col:
+                        st.markdown(
+                            f"<div style='font-size:0.95rem;font-weight:750;margin:0 0 0.15rem 0;'>SUCCESSOR {successor_number}</div>",
+                            unsafe_allow_html=True
+                        )
+                    with delete_col:
+                        if st.button("🗑️", key=f"{sheet}_delete_successor_{successor_number}", help="Delete successor and linked land"):
+                            delete_successor(successor_number, successor_count)
+                            st.rerun()
+                    person_form(f"successor_{successor_number}", "SUCCESSOR", ppb_optional=True)
+                    all_successor_total_guntas += render_successor_land(successor_number)
+
+    add_col, _ = st.columns([0.9, 3.1], gap="small")
+    with add_col:
+        if st.button("➕ ADD SUCCESSOR", key=f"{sheet}_add_successor", use_container_width=False):
+            st.session_state[f"{sheet}_successor_count"] += 1
+            st.rerun()
+
+    all_acres = all_successor_total_guntas // 40
+    all_remaining_guntas = all_successor_total_guntas % 40
+    all_successors_extent = f"{all_acres}.{all_remaining_guntas:02d}00"
+    st.markdown("#### 🌾 TOTAL EXTENT — ALL SUCCESSORS")
+    total_all_col, _ = st.columns([0.9, 3.1], gap="small")
+    all_total_widget_key = f"{sheet}_all_successors_total_extent"
+    st.session_state[all_total_widget_key] = all_successors_extent
+    with total_all_col:
+        st.text_input("TOTAL EXTENT", value=all_successors_extent, disabled=True, key=all_total_widget_key)
 st.divider()
 
 
@@ -4620,213 +5748,164 @@ st.divider()
 # LAND AND PAYMENT SPLIT VIEW
 # =========================================================
 
-land_column, payment_column = (
-
-    st.columns(
-
-        2,
-
-        gap="medium"
-
-    )
-
-)
+if selected_document == "SUCCESSION":
+    payment_column = st.container()
+else:
+    land_column, payment_column = st.columns(2, gap="medium")
 
 
 # =========================================================
 # LAND DETAILS
 # =========================================================
 
-with land_column:
+if selected_document != "SUCCESSION":
+    with land_column:
 
-    st.markdown(
+        st.markdown(
 
-        """
+            """
 
-        <div class="section-title">
+            <div class="section-title land-details-title">
 
-        🌾 LAND DETAILS
+            🌾 LAND DETAILS
 
-        </div>
+            </div>
 
-        """,
+            """,
 
-        unsafe_allow_html=True
-
-    )
-
-
-    if st.button(
-
-        "➕ ADD NEW SURVEY NO.",
-
-        use_container_width=True,
-
-        key=(
-
-            f"{sheet}_"
-
-            "add_survey"
+            unsafe_allow_html=True
 
         )
 
-    ):
 
-        collect_data()
+        if st.button(
 
+            "➕ ADD NEW SURVEY NO.",
 
-        existing_ids = [
+            use_container_width=True,
 
-            survey["id"]
+            key=(
 
-            for survey in
+                f"{sheet}_"
 
-            data["surveys"]
+                "add_survey"
 
-        ]
-
-
-        new_id = (
-
-            max(
-                existing_ids
             )
-            +
-            1
 
-            if existing_ids
-
-            else 1
-
-        )
-
-
-        data["surveys"].append(
-
-            {
-
-                "id": new_id,
-
-                "survey_number": "",
-
-                "extent": "",
-
-                "north": "",
-
-                "south": "",
-
-                "east": "",
-
-                "west": ""
-
-            }
-
-        )
-
-
-        save_database()
-
-
-        st.rerun()
-
-
-    live_total_guntas = 0
-
-    invalid_extent = False
-
-
-    for survey in (
-        data["surveys"].copy()
-    ):
-
-        survey_id = (
-            survey["id"]
-        )
-
-
-        with st.container(
-            border=True
         ):
 
-            survey_column, extent_column, delete_column = (
+            collect_data()
 
-                st.columns(
 
-                    [
+            existing_ids = [
 
-                        2,
+                survey["id"]
 
-                        1.4,
+                for survey in
 
-                        0.6
+                data["surveys"]
 
-                    ]
+            ]
 
+
+            new_id = (
+
+                max(
+                    existing_ids
                 )
+                +
+                1
+
+                if existing_ids
+
+                else 1
 
             )
 
 
-            with survey_column:
+            data["surveys"].append(
 
-                st.text_input(
+                {
 
-                    "Survey No.",
+                    "id": new_id,
 
-                    value=(
+                    "survey_number": "",
 
-                        survey.get(
+                    "extent": "",
 
-                            "survey_number",
+                    "north": "",
 
-                            ""
+                    "south": "",
 
-                        )
+                    "east": "",
 
-                    ),
+                    "west": ""
 
-                    key=(
+                }
 
-                        f"{sheet}_"
+            )
 
-                        f"survey_"
 
-                        f"{survey_id}_"
+            save_database()
 
-                        "survey_number"
+
+            st.rerun()
+
+
+        live_total_guntas = 0
+
+        invalid_extent = False
+
+
+        for survey in (
+            data["surveys"].copy()
+        ):
+
+            survey_id = (
+                survey["id"]
+            )
+
+
+            with st.container(
+                border=True
+            ):
+
+                survey_column, extent_column, delete_column = (
+
+                    st.columns(
+
+                        [
+
+                            2,
+
+                            1.4,
+
+                            0.6
+
+                        ]
 
                     )
 
                 )
 
 
-            with extent_column:
-
-                extent_value = (
+                with survey_column:
 
                     st.text_input(
 
-                        "Extent",
+                        "Survey No.",
 
                         value=(
 
                             survey.get(
 
-                                "extent",
+                                "survey_number",
 
                                 ""
 
                             )
 
                         ),
-
-                        placeholder=(
-
-                            "Example: 1.1500"
-
-                        ),
-
-                        max_chars=20,
 
                         key=(
 
@@ -4836,334 +5915,363 @@ with land_column:
 
                             f"{survey_id}_"
 
-                            "extent"
+                            "survey_number"
 
                         )
+
+                    )
+
+
+                with extent_column:
+
+                    extent_value = (
+
+                        st.text_input(
+
+                            "Extent",
+
+                            value=(
+
+                                survey.get(
+
+                                    "extent",
+
+                                    ""
+
+                                )
+
+                            ),
+
+                            placeholder=(
+
+                                "Example: 1.1500"
+
+                            ),
+
+                            max_chars=20,
+
+                            key=(
+
+                                f"{sheet}_"
+
+                                f"survey_"
+
+                                f"{survey_id}_"
+
+                                "extent"
+
+                            )
+
+                        )
+
+                    )
+
+
+                with delete_column:
+
+                    st.caption(
+                        "DELETE"
+                    )
+
+
+                    if st.button(
+
+                        "🗑️",
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"delete_survey_"
+
+                            f"{survey_id}"
+
+                        ),
+
+                        use_container_width=True
+
+                    ):
+
+                        collect_data()
+
+
+                        data["surveys"] = [
+
+                            item
+
+                            for item in
+
+                            data["surveys"]
+
+                            if item["id"]
+
+                            != survey_id
+
+                        ]
+
+
+                        save_database()
+
+
+                        st.rerun()
+
+
+                north_column, south_column = (
+
+                    st.columns(2)
+
+                )
+
+
+                with north_column:
+
+                    st.text_input(
+
+                        "North",
+
+                        value=(
+
+                            survey.get(
+
+                                "north",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "north"
+
+                        )
+
+                    )
+
+
+                with south_column:
+
+                    st.text_input(
+
+                        "South",
+
+                        value=(
+
+                            survey.get(
+
+                                "south",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "south"
+
+                        )
+
+                    )
+
+
+                east_column, west_column = (
+
+                    st.columns(2)
+
+                )
+
+
+                with east_column:
+
+                    st.text_input(
+
+                        "East",
+
+                        value=(
+
+                            survey.get(
+
+                                "east",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "east"
+
+                        )
+
+                    )
+
+
+                with west_column:
+
+                    st.text_input(
+
+                        "West",
+
+                        value=(
+
+                            survey.get(
+
+                                "west",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "west"
+
+                        )
+
+                    )
+
+
+                cleaned_live_extent = (
+
+                    clean_extent(
+
+                        extent_value
 
                     )
 
                 )
 
 
-            with delete_column:
-
-                st.caption(
-                    "DELETE"
-                )
-
-
-                if st.button(
-
-                    "🗑️",
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"delete_survey_"
-
-                        f"{survey_id}"
-
-                    ),
-
-                    use_container_width=True
-
-                ):
-
-                    collect_data()
-
-
-                    data["surveys"] = [
-
-                        item
-
-                        for item in
-
-                        data["surveys"]
-
-                        if item["id"]
-
-                        != survey_id
-
-                    ]
-
-
-                    save_database()
-
-
-                    st.rerun()
-
-
-            north_column, south_column = (
-
-                st.columns(2)
-
-            )
-
-
-            with north_column:
-
-                st.text_input(
-
-                    "North",
-
-                    value=(
-
-                        survey.get(
-
-                            "north",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "north"
-
-                    )
-
-                )
-
-
-            with south_column:
-
-                st.text_input(
-
-                    "South",
-
-                    value=(
-
-                        survey.get(
-
-                            "south",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "south"
-
-                    )
-
-                )
-
-
-            east_column, west_column = (
-
-                st.columns(2)
-
-            )
-
-
-            with east_column:
-
-                st.text_input(
-
-                    "East",
-
-                    value=(
-
-                        survey.get(
-
-                            "east",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "east"
-
-                    )
-
-                )
-
-
-            with west_column:
-
-                st.text_input(
-
-                    "West",
-
-                    value=(
-
-                        survey.get(
-
-                            "west",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "west"
-
-                    )
-
-                )
-
-
-            cleaned_live_extent = (
-
-                clean_extent(
-
+                if (
                     extent_value
 
-                )
-
-            )
-
-
-            if (
-                extent_value
-
-                !=
-
-                cleaned_live_extent
-            ):
-
-                st.warning(
-
-                    "Extent allows numbers, "
-
-                    "one decimal point and "
-
-                    "a maximum of four digits "
-
-                    "after the decimal."
-
-                )
-
-
-            converted_extent = (
-
-                extent_guntas(
+                    !=
 
                     cleaned_live_extent
+                ):
 
-                )
+                    st.warning(
 
-            )
+                        "Extent allows numbers, "
 
+                        "one decimal point and "
 
-            if converted_extent is None:
+                        "a maximum of four digits "
 
-                invalid_extent = True
+                        "after the decimal."
 
-
-                st.error(
-
-                    "Invalid extent. Use a "
-
-                    "format such as 1.1500. "
-
-                    "The first two digits "
-
-                    "after the decimal are "
-
-                    "guntas and must be "
-
-                    "between 00 and 39."
-
-                )
+                    )
 
 
-            else:
+                converted_extent = (
 
-                live_total_guntas += (
+                    extent_guntas(
 
-                    converted_extent
+                        cleaned_live_extent
+
+                    )
 
                 )
 
 
-    total_acres = (
+                if converted_extent is None:
 
-        live_total_guntas
-
-        // 40
-
-    )
+                    invalid_extent = True
 
 
-    remaining_guntas = (
+                    st.error(
 
-        live_total_guntas
+                        "Invalid extent. Use a "
 
-        % 40
+                        "format such as 1.1500. "
 
-    )
+                        "The first two digits "
 
+                        "after the decimal are "
 
-    live_total_extent = (
+                        "guntas and must be "
 
-        f"{total_acres}."
+                        "between 00 and 39."
 
-        f"{remaining_guntas:02d}"
-
-        "00"
-
-    )
+                    )
 
 
-    st.text_input(
+                else:
 
-        "TOTAL EXTENT",
+                    live_total_guntas += (
 
-        value=(
+                        converted_extent
 
-            live_total_extent
+                    )
 
-        ),
 
-        disabled=True,
+        total_acres = (
 
-        key=(
+            live_total_guntas
 
-            f"{sheet}_"
-
-            "total_extent_display"
+            // 40
 
         )
 
-    )
+
+        remaining_guntas = (
+
+            live_total_guntas
+
+            % 40
+
+        )
+
+
+        live_total_extent = (
+
+            f"{total_acres}."
+
+            f"{remaining_guntas:02d}"
+
+            "00"
+
+        )
+
+    total_extent_box = st.container(border=True)
+
+    with total_extent_box:
+        st.markdown("#### TOTAL EXTENT")
+
+        st.markdown(
+            f"## {live_total_extent}"
+        )
 
 
 # =========================================================
@@ -5176,7 +6284,7 @@ with payment_column:
 
         """
 
-        <div class="section-title">
+        <div class="section-title payment-details-title">
 
         💰 PAYMENT DETAILS
 
@@ -5224,11 +6332,35 @@ with payment_column:
     )
 
 
+    # Additional payment details for all document types.
+    charges = st.number_input(
+        "CHARGES",
+        min_value=0.0,
+        value=float(data.get("charges", 0.0)),
+        step=100.0,
+        key=f"{sheet}_charges"
+    )
+
+    # Keep the current widget values in sheet data immediately.
+    data["challan_amount"] = float(challan_amount)
+    data["charges"] = float(charges)
+
+    # Automatically calculated from Challan + Charges.
+    total_payable = float(challan_amount) + float(charges)
+
+    st.number_input(
+        "TOTAL PAYABLE",
+        min_value=0.0,
+        value=float(total_payable),
+        disabled=True,
+        key=f"{sheet}_total_payable_display"
+    )
+
     if st.button(
 
         "➕ ADD ANOTHER PAYMENT",
 
-        use_container_width=True,
+        use_container_width=False,
 
         key=(
 
@@ -5277,7 +6409,10 @@ with payment_column:
                 new_payment_id,
 
                 "amount":
-                0.0
+                0.0,
+
+                "payment_mode":
+                "CASH"
 
             }
 
@@ -5302,21 +6437,7 @@ with payment_column:
         )
 
 
-        amount_column, delete_column = (
-
-            st.columns(
-
-                [
-
-                    4,
-
-                    1
-
-                ]
-
-            )
-
-        )
+        amount_column, mode_column, delete_column = st.columns([4, 3, 1])
 
 
         with amount_column:
@@ -5356,6 +6477,21 @@ with payment_column:
 
                 )
 
+            )
+
+
+        with mode_column:
+
+            payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
+            saved_payment_mode = str(payment.get("payment_mode", "CASH"))
+            if saved_payment_mode not in payment_mode_options:
+                saved_payment_mode = "CASH"
+
+            payment_mode = st.selectbox(
+                "PAYMENT MODE",
+                payment_mode_options,
+                index=payment_mode_options.index(saved_payment_mode),
+                key=f"{sheet}_payment_mode_{payment_id}"
             )
 
 
@@ -5408,14 +6544,21 @@ with payment_column:
                 st.rerun()
 
 
-        payment_values.append(
-            amount
-        )
+        # Keep the live value in the current sheet data so totals and later saves
+        # always use what is currently entered in the widgets.
+        payment["amount"] = float(amount)
+        payment["payment_mode"] = payment_mode
+        payment_values.append(float(amount))
 
 
+    # Calculate the totals LIVE from every visible payment row.
     total_paid = sum(
         payment_values
     )
+
+    # Keep calculated values in the current sheet data as well.
+    data["total_paid"] = float(total_paid)
+    data["total_payable"] = float(total_payable)
 
 
     total_column, balance_column = (
@@ -5452,7 +6595,7 @@ with payment_column:
 
         balance = (
 
-            challan_amount
+            total_payable
 
             -
 
@@ -5460,6 +6603,8 @@ with payment_column:
 
         )
 
+
+        data["balance_amount"] = float(balance)
 
         st.number_input(
 
@@ -5619,140 +6764,273 @@ st.divider()
 
 
 # =========================================================
+# FINAL ACTIONS
+# =========================================================
+
+st.markdown(
+    '<div class="section-title">💾 SAVE & DOCUMENT ACTIONS</div>',
+    unsafe_allow_html=True
+)
+
+def _get_email_settings():
+    """Read email settings from Streamlit secrets or environment variables."""
+    try:
+        cfg = st.secrets.get("email", {})
+    except Exception:
+        cfg = {}
+
+    sender = cfg.get("sender") or os.getenv("NSMART_EMAIL_SENDER")
+    password = cfg.get("password") or os.getenv("NSMART_EMAIL_PASSWORD")
+    recipient = cfg.get("recipient") or os.getenv("NSMART_EMAIL_RECIPIENT")
+    smtp_server = cfg.get("smtp_server") or os.getenv("NSMART_SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(cfg.get("smtp_port") or os.getenv("NSMART_SMTP_PORT", "465"))
+
+    return sender, password, recipient, smtp_server, smtp_port
+
+
+def _send_pdf_email(sheet_name, pdf_data, recipient_override=None):
+    sender, password, configured_recipient, smtp_server, smtp_port = _get_email_settings()
+    recipient = (recipient_override or configured_recipient or "").strip()
+
+    if not sender or not password:
+        return False, "Email is not configured yet. Add the email settings first."
+    if not recipient:
+        return False, "No recipient email address is configured."
+
+    msg = EmailMessage()
+    msg["Subject"] = f"N-SMART - {sheet_name}"
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg.set_content(
+        f"Attached is the N-SMART document PDF for {sheet_name}.\n\n"
+        "This email was sent from N-SMART Online Services."
+    )
+    msg.add_attachment(
+        pdf_data,
+        maintype="application",
+        subtype="pdf",
+        filename=f"{sheet_name}.pdf"
+    )
+
+    try:
+        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as smtp:
+            smtp.login(sender, password)
+            smtp.send_message(msg)
+        return True, f"{sheet_name}.pdf sent successfully to {recipient}."
+    except Exception as exc:
+        return False, f"Email could not be sent: {exc}"
+
+
+
+
+# =========================================================
 # SAVE FILE
 # =========================================================
 
-if st.button(
+# =========================================================
+# SAVE + DOWNLOAD + PRINT ACTIONS
+# =========================================================
 
-    "💾 SAVE FILE",
+# Keep the three actions together. If this sheet has already been saved,
+# use the existing PDF; otherwise build a temporary PDF from the current data
+# so Download/Print are still available without removing any existing features.
+_current_sheet_for_actions = st.session_state.get("current_sheet", sheet)
+_current_pdf_for_actions = st.session_state.get("saved_pdf", b"")
 
-    type="primary",
-
-    use_container_width=True,
-
-    key=(
-
-        f"{sheet}_"
-
-        "save_file"
-
-    )
-
+if (
+    not _current_pdf_for_actions
+    or st.session_state.get("saved_sheet") != _current_sheet_for_actions
 ):
-
-    collect_data()
-
-
-    data = (
-
-        st.session_state.database[
-
-            sheet
-
-        ]
-
+    _pdf_file_for_actions = os.path.join(
+        PDF_FOLDER,
+        f"{_current_sheet_for_actions}.pdf"
     )
+    if os.path.exists(_pdf_file_for_actions):
+        try:
+            with open(_pdf_file_for_actions, "rb") as _pdf_action_file:
+                _current_pdf_for_actions = _pdf_action_file.read()
+        except Exception:
+            _current_pdf_for_actions = b""
 
+_action_save_col, _action_download_col, _action_print_col = st.columns(3)
 
-    calculated_extent, invalid = (
-
-        total_extent(
-
-            data["surveys"]
-
+with _action_download_col:
+    if _current_pdf_for_actions:
+        st.download_button(
+            "📄 DOWNLOAD PDF",
+            data=_current_pdf_for_actions,
+            file_name=f"{_current_sheet_for_actions}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key=f"download_pdf_near_save_{_current_sheet_for_actions}"
         )
-
-    )
-
-
-    if invalid:
-
-        st.error(
-
-            "The file was not saved. "
-
-            "Correct the invalid "
-
-            "extent first."
-
-        )
-
-
     else:
-
-        data["saved"] = True
-
-
-        save_database()
-
-
-        pdf_bytes = (
-
-            create_pdf(
-
-                sheet,
-
-                data
-
-            )
-
+        st.button(
+            "📄 DOWNLOAD PDF",
+            disabled=True,
+            use_container_width=True,
+            key=f"download_pdf_disabled_{_current_sheet_for_actions}",
+            help="Save the file once to generate the PDF."
         )
 
+with _action_print_col:
+    if _current_pdf_for_actions:
+        # Use a Blob URL instead of a huge data: URL. Some browsers open large
+        # PDF data URLs as blank pages, which was causing the blank print window.
+        _print_b64 = base64.b64encode(
+            _current_pdf_for_actions
+        ).decode("utf-8")
 
-        pdf_path = (
+        _print_html = f"""
+        <html>
+        <body style="margin:0;padding:0;">
+            <button id="printBtn" style="
+                width:100%;
+                border:none;
+                border-radius:8px;
+                padding:0.62rem 0.8rem;
+                font-size:14px;
+                font-weight:700;
+                cursor:pointer;
+                background:#16a34a;
+                color:white;
+            ">🖨️ PRINT DOCUMENT</button>
 
-            os.path.join(
+            <script>
+            document.getElementById("printBtn").addEventListener("click", function() {{
+                try {{
+                    const base64 = "{_print_b64}";
+                    const binary = atob(base64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {{
+                        bytes[i] = binary.charCodeAt(i);
+                    }}
 
-                PDF_FOLDER,
+                    const blob = new Blob([bytes], {{
+                        type: "application/pdf"
+                    }});
+                    const url = URL.createObjectURL(blob);
 
-                f"{sheet}.pdf"
+                    const printWindow = window.open(url, "_blank");
+                    if (printWindow) {{
+                        setTimeout(function() {{
+                            try {{
+                                printWindow.focus();
+                                printWindow.print();
+                            }} catch (e) {{
+                                console.error(e);
+                            }}
+                        }}, 1200);
+                    }} else {{
+                        alert("Please allow pop-ups to print the document.");
+                    }}
+                }} catch (err) {{
+                    console.error(err);
+                    alert("Unable to prepare the document for printing.");
+                }}
+            }});
+            </script>
+        </body>
+        </html>
+        """
 
-            )
-
+        st.components.v1.html(
+            _print_html,
+            height=52,
+            scrolling=False
+        )
+    else:
+        st.button(
+            "🖨️ PRINT DOCUMENT",
+            disabled=True,
+            use_container_width=True,
+            key=f"print_pdf_disabled_{_current_sheet_for_actions}",
+            help="Save the file once to generate the PDF."
         )
 
+with _action_save_col:
+    if st.button(
+        "💾 SAVE FILE",
+        type="primary",
+        use_container_width=True,
+        key=(
+            f"{sheet}_"
+            "save_file"
+        )
+    ):
 
-        with open(
+        collect_data()
 
-            pdf_path,
+        data = (
+            st.session_state.database[
+                sheet
+            ]
+        )
 
-            "wb"
+        calculated_extent, invalid = (
+            total_extent(
+                data["surveys"]
+            )
+        )
 
-        ) as pdf_file:
+        if invalid:
 
-            pdf_file.write(
-
-                pdf_bytes
-
+            st.error(
+                "The file was not saved. "
+                "Correct the invalid "
+                "extent first."
             )
 
+        else:
 
-        st.session_state[
+            data["saved"] = True
 
-            "saved_pdf"
+            save_database()
 
-        ] = pdf_bytes
+            pdf_bytes = (
+                create_pdf(
+                    sheet,
+                    data
+                )
+            )
 
+            pdf_path = (
+                os.path.join(
+                    PDF_FOLDER,
+                    f"{sheet}.pdf"
+                )
+            )
 
-        st.session_state[
+            with open(
+                pdf_path,
+                "wb"
+            ) as pdf_file:
 
-            "saved_sheet"
+                pdf_file.write(
+                    pdf_bytes
+                )
 
-        ] = sheet
+            st.session_state[
+                "saved_pdf"
+            ] = pdf_bytes
 
+            st.session_state[
+                "saved_sheet"
+            ] = sheet
 
-        st.session_state[
+            st.session_state[
+                "show_saved_options"
+            ] = True
 
-            "show_saved_options"
+            # Automatically send the generated PDF to the configured email on every save.
+            email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
 
-        ] = True
+            if email_ok:
+                st.success(f"{sheet} saved successfully. {email_message}")
+            else:
+                st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
 
-
-        st.success(
-
-            f"{sheet} saved successfully."
-
-        )
+            st.rerun()
 
 
 # =========================================================
@@ -5793,152 +7071,45 @@ if st.session_state.get(
     )
 
 
-    download_column, print_column, next_column = (
-
-        st.columns(3)
-
-    )
-
-
-    with download_column:
-
-        st.download_button(
-
-            "📄 DOWNLOAD PDF",
-
-            data=saved_pdf,
-
-            file_name=(
-
-                f"{saved_sheet}.pdf"
-
-            ),
-
-            mime=(
-
-                "application/pdf"
-
-            ),
-
-            use_container_width=True
-
-        )
-
-
-    with print_column:
-
-        encoded_pdf = (
-
-            base64.b64encode(
-
-                saved_pdf
-
-            ).decode(
-
-                "utf-8"
-
-            )
-
-        )
-
-
-        st.markdown(
-
-            f"""
-
-            <a
-
-            href="data:application/pdf;base64,{encoded_pdf}"
-
-            target="_blank"
-
-            style="
-
-            display:block;
-
-            border:1px solid #888;
-
-            border-radius:8px;
-
-            padding:0.55rem;
-
-            text-align:center;
-
-            text-decoration:none;
-
-            font-weight:700;
-
-            ">
-
-            🖨️ OPEN PDF TO PRINT
-
-            </a>
-
-            """,
-
-            unsafe_allow_html=True
-
-        )
-
+    next_column = st.container()
 
     with next_column:
 
-        if st.button(
-
-            "➡️ OPEN NEXT EMPTY SHEET",
-
-            type="primary",
-
-            use_container_width=True
-
-        ):
-
-            old_sheet = (
-
-                st.session_state.current_sheet
-
-            )
-
-
-            clear_widgets(
-                old_sheet
-            )
-
-
-            new_sheet = (
-                next_sheet()
-            )
-
-
-            st.session_state.database[
-
-                new_sheet
-
-            ] = empty_file()
+        # Open the next empty sheet in a completely separate browser tab.
+        # The current saved sheet and its session data are left untouched.
+        st.markdown(
+            f"""
+            <a href="./?new_sheet=1&auth={_current_auth_token()}"
+               target="_blank"
+               rel="noopener noreferrer"
+               style="
+                    display:block;
+                    width:100%;
+                    box-sizing:border-box;
+                    text-align:center;
+                    padding:0.62rem 0.8rem;
+                    border-radius:0.55rem;
+                    text-decoration:none;
+                    font-weight:700;
+                    background:#2563eb;
+                    color:white;
+                    border:1px solid rgba(255,255,255,0.15);
+                ">
+                ➡️ OPEN NEXT EMPTY SHEET ↗
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
 
 
-            save_database()
+# =========================================================
+# AUTO-PERSIST CURRENT IN-PROGRESS SHEET
+# =========================================================
+try:
+    collect_data()
+    save_database()
+except Exception:
+    # Do not interrupt existing UI/actions if a widget is temporarily absent
+    # during a document-type/layout change.
+    pass
 
-
-            st.session_state.current_sheet = (
-
-                new_sheet
-
-            )
-
-
-            st.session_state[
-
-                "show_saved_options"
-
-            ] = False
-
-
-            st.session_state[
-
-                "main_search"
-
-            ] = ""
-
-
-            st.rerun()
