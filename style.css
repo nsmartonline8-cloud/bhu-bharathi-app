@@ -314,3 +314,71 @@ div[data-testid="stTextInput"] input:disabled {
     -webkit-text-fill-color: #111827 !important;
     opacity: 1 !important;
 }
+/* =====================================================
+   FINAL FIX — DOWNLOAD PDF BUTTON TEXT
+===================================================== */
+
+/* Streamlit download button */
+[data-testid="stDownloadButton"] button,
+.stDownloadButton button {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+    font-weight: 700 !important;
+}
+
+/* Text inside download button */
+[data-testid="stDownloadButton"] button span,
+[data-testid="stDownloadButton"] button p,
+.stDownloadButton button span,
+.stDownloadButton button p {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+}
+
+
+/* =====================================================
+   FINAL FIX — STREAMLIT DROPDOWN OPTIONS
+===================================================== */
+
+/* Dropdown popup container */
+div[data-baseweb="popover"] {
+    background-color: #ffffff !important;
+}
+
+/* Menu */
+div[data-baseweb="menu"] {
+    background-color: #ffffff !important;
+}
+
+/* Every dropdown option */
+div[role="option"] {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+    font-weight: 600 !important;
+}
+
+/* Everything inside dropdown options */
+div[role="option"] *,
+li[role="option"] * {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+}
+
+/* Hover */
+div[role="option"]:hover,
+li[role="option"]:hover {
+    background-color: #dbeafe !important;
+    color: #000000 !important;
+}
+
+/* Selected dropdown value */
+[data-baseweb="select"] span,
+[data-baseweb="select"] div {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+}
