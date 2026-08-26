@@ -224,6 +224,21 @@ hr { border-color: rgba(148,163,184,.14) !important; }
 ::-webkit-scrollbar-thumb { background: #294664; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a638b; }
 
+/* ---------- CALCULATED PAYMENT FIELDS ---------- */
+
+/* Total Payable, Total Amount Paid, Balance Amount */
+div[data-testid="stTextInput"] input:disabled {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    opacity: 1 !important;
+    font-weight: 700 !important;
+    background-color: #303946 !important;
+}
+
+/* Keep the disabled input container visible */
+div[data-testid="stTextInput"] input:disabled {
+    border: 1px solid #8aa4c0 !important;
+}
 /* ---------- MOBILE ---------- */
 @media (max-width: 768px) {
     .block-container { padding-left: .7rem !important; padding-right: .7rem !important; }
