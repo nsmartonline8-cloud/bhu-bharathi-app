@@ -11,7 +11,6 @@ import base64
 import hashlib
 import hmac
 import secrets
-import time
 import smtplib
 from email.message import EmailMessage
 from io import BytesIO
@@ -224,72 +223,6 @@ def _check_login(username, password):
     return _check_user_account(username, password)
 
 
-# =========================================================
-# PERSISTENT LOGIN TOKEN
-# =========================================================
-# Streamlit session_state is lost on browser refresh/new tabs. A signed,
-# time-limited token in the URL keeps the same authenticated browser session
-# logged in across refreshes and sheets without removing the login system.
-AUTH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30
-
-
-def _auth_token_secret():
-    auth = _load_local_auth()
-    base = (
-        str(auth.get("password_hash", ""))
-        if auth else ""
-    )
-    if not base:
-        base = LOGIN_USERNAME + "|NSMART"
-    return hashlib.sha256(base.encode("utf-8")).hexdigest()
-
-
-def _make_auth_token(username):
-    expiry = int(time.time()) + AUTH_TOKEN_TTL_SECONDS
-    payload = f"{str(username).upper()}|{expiry}"
-    signature = hmac.new(
-        _auth_token_secret().encode("utf-8"),
-        payload.encode("utf-8"),
-        hashlib.sha256
-    ).hexdigest()
-    raw = f"{payload}|{signature}".encode("utf-8")
-    return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
-
-
-def _read_auth_token(token):
-    try:
-        token = str(token or "").strip()
-        if not token:
-            return None
-        padded = token + ("=" * (-len(token) % 4))
-        raw = base64.urlsafe_b64decode(
-            padded.encode("utf-8")
-        ).decode("utf-8")
-        username, expiry_text, signature = raw.split("|", 2)
-        expiry = int(expiry_text)
-        payload = f"{username}|{expiry}"
-        expected = hmac.new(
-            _auth_token_secret().encode("utf-8"),
-            payload.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-        if (
-            expiry >= int(time.time())
-            and hmac.compare_digest(signature, expected)
-        ):
-            return username
-    except Exception:
-        pass
-    return None
-
-
-def _current_auth_token():
-    token = st.session_state.get("nsmart_auth_token", "")
-    if token:
-        return token
-    return str(st.query_params.get("auth", "")).strip()
-
-
 def show_login_screen():
     st.markdown(
         """
@@ -415,12 +348,6 @@ def show_login_screen():
             st.session_state.nsmart_login_user = account["username"]
             st.session_state.nsmart_login_role = account.get("role", "USER")
             st.session_state.nsmart_login_name = account.get("full_name", "")
-            st.session_state.nsmart_auth_token = _make_auth_token(
-                account["username"]
-            )
-            st.query_params["auth"] = (
-                st.session_state.nsmart_auth_token
-            )
             st.rerun()
         else:
             st.error("Incorrect username or password, or your account is not approved.")
@@ -431,73 +358,7 @@ def show_login_screen():
 if "nsmart_authenticated" not in st.session_state:
     st.session_state.nsmart_authenticated = False
 
-# Restore login after browser refresh or when opening another sheet/tab.
-_url_auth_token = str(
-    st.query_params.get("auth", "")
-).strip()
-_token_user = _read_auth_token(_url_auth_token)
-
-if _token_user:
-    st.session_state.nsmart_authenticated = True
-    st.session_state.nsmart_login_user = _token_user
-    st.session_state.nsmart_auth_token = _url_auth_token
-    if "nsmart_login_role" not in st.session_state:
-        st.session_state.nsmart_login_role = "ADMIN" if _token_user == LOGIN_USERNAME else "USER"
-
-
-# =========================================================
-# DASHBOARD SAVED-SHEET OPEN ACCESS
-# =========================================================
-# Saved sheets opened from Dashboard/Search open in a new tab. A new browser
-# tab has a fresh Streamlit session, so it would normally show the login page
-# again. Only links explicitly created by the Dashboard/Search use
-# dashboard_open=1. For those links, allow direct viewing only when the
-# requested sheet exists and is already marked as saved.
-_dashboard_sheet_request = str(
-    st.query_params.get("sheet", "")
-).strip().upper()
-
-_dashboard_open_request = str(
-    st.query_params.get("dashboard_open", "")
-).strip()
-
-_dashboard_saved_sheet_access = False
-
-if (
-    _dashboard_open_request == "1"
-    and _dashboard_sheet_request
-):
-    try:
-        _dashboard_data_file = "bhu_bharathi_data.json"
-        if os.path.exists(_dashboard_data_file):
-            with open(
-                _dashboard_data_file,
-                "r",
-                encoding="utf-8"
-            ) as _dashboard_file:
-                _dashboard_database = json.load(_dashboard_file)
-
-            _dashboard_sheet_data = (
-                _dashboard_database.get(
-                    _dashboard_sheet_request,
-                    {}
-                )
-            )
-
-            _dashboard_saved_sheet_access = bool(
-                _dashboard_sheet_data.get(
-                    "saved",
-                    False
-                )
-            )
-    except Exception:
-        _dashboard_saved_sheet_access = False
-
-
-if (
-    not st.session_state.nsmart_authenticated
-    and not _dashboard_saved_sheet_access
-):
+if not st.session_state.nsmart_authenticated:
     show_login_screen()
     st.stop()
 
@@ -1082,8 +943,8 @@ requested_sheet = str(requested_sheet).strip().upper()
 if (
     requested_sheet
     and requested_sheet in st.session_state.database
+    and st.session_state.database[requested_sheet].get("saved", False)
 ):
-    # Restores both saved and in-progress sheets after refresh.
     st.session_state.current_sheet = requested_sheet
 elif "current_sheet" not in st.session_state:
     st.session_state.current_sheet = next_sheet()
@@ -1760,6 +1621,12 @@ def search_files(
 
     fields = [
 
+        # Sheet / transaction identifiers
+        "transaction_number",
+        "document_type",
+
+        # Primary party details
+        "first_ppb",
         "first_name",
 
         "first_aadhaar",
@@ -1774,6 +1641,8 @@ def search_files(
 
         "first_family_cell",
 
+        # Secondary party details
+        "second_ppb",
         "second_name",
 
         "second_aadhaar",
@@ -3444,8 +3313,8 @@ with st.sidebar:
     # Opens a brand-new empty sheet in a separate browser tab.
     # The current sheet and its current data remain untouched.
     st.markdown(
-        f"""
-        <a href="./?new_sheet=1&auth={_current_auth_token()}" target="_blank" rel="noopener noreferrer"
+        """
+        <a href="./?new_sheet=1" target="_blank" rel="noopener noreferrer"
            style="display:block; text-align:center; padding:0.55rem 0.8rem;
                   border-radius:0.5rem; text-decoration:none; font-weight:700;
                   background:#1f77b4; color:white; margin-bottom:0.5rem;">
@@ -3655,7 +3524,7 @@ if navigation == "📊 Dashboard":
                         primary_name = saved_sheet_data.get("first_name", "") or "—"
                         st.markdown(
                             f"""
-                            <a href="?sheet={saved_sheet_name}&dashboard_open=1&auth={_current_auth_token()}" target="_blank"
+                            <a href="?sheet={saved_sheet_name}" target="_blank"
                                style="text-decoration:none; display:block;">
                               <div style="min-height:145px; padding:16px; border:1px solid #26364d;
                                           border-radius:14px; background:#111c2f; margin-bottom:12px; cursor:pointer;">
@@ -3823,9 +3692,9 @@ with search_column:
 
             placeholder=(
 
-                "Name, cell, Aadhaar "
+                "Name, cell, Aadhaar, PPB NO., "
 
-                "or NS-0001"
+                "TXN NO. or NS-0001"
 
             ),
 
@@ -3897,7 +3766,7 @@ if search_text.strip():
 
                 # Opens the selected saved sheet in a new browser tab.
                 st.markdown(
-                    f"""<a href="?sheet={result}&dashboard_open=1&auth={_current_auth_token()}" target="_blank"
+                    f"""<a href="?sheet={result}" target="_blank"
                     style="display:block; text-align:center; padding:0.55rem 0.7rem;
                     border-radius:8px; background:#1d4ed8; color:white;
                     text-decoration:none; font-weight:700;">📂 OPEN ↗</a>""",
@@ -3934,6 +3803,14 @@ st.markdown(
 
     unsafe_allow_html=True
 
+)
+
+
+# TXN NO. is common to every document type and sits directly below the document heading.
+st.text_input(
+    "TXN NO.",
+    value=data.get("transaction_number", ""),
+    key=f"{sheet}_transaction_number"
 )
 
 
@@ -3977,33 +3854,15 @@ def person_form(
         )
 
 
-        name_col, txn_col = st.columns(2)
+        st.text_input(
 
+            "BANK NAME",
 
-        with name_col:
+            value=data.get(f"{prefix}_name", ""),
 
-            st.text_input(
+            key=f"{sheet}_{prefix}_name"
 
-                "BANK NAME",
-
-                value=data.get(f"{prefix}_name", ""),
-
-                key=f"{sheet}_{prefix}_name"
-
-            )
-
-
-        with txn_col:
-
-            st.text_input(
-
-                "TXN No.",
-
-                value=data.get("transaction_number", ""),
-
-                key=f"{sheet}_transaction_number"
-
-            )
+        )
 
 
         cin_col, gstin_col = st.columns(2)
@@ -4607,6 +4466,34 @@ def person_form(
             st.date_input("DOD", value=dod_value, min_value=date(1, 1, 1), max_value=date(9999, 12, 31), key=f"{sheet}_first_dod")
 
     else:
+
+        # PPB field placement:
+        # - First person (Seller/Donor/Mortgagor/etc.): always before the name.
+        # - Second person: optional PPB field for SALE, GIFT and MORTGAGE.
+        show_ppb_field = (
+            prefix == "first"
+            or (
+                prefix == "second"
+                and ppb_optional
+                and selected_document in ["SALE", "GIFT", "MORTGAGE"]
+            )
+        )
+
+        if show_ppb_field:
+            ppb_label = (
+                "PPB NO."
+                if prefix == "first"
+                else "IF HAVE PPB NO."
+            )
+
+            st.text_input(
+                ppb_label,
+                value=data.get(
+                    f"{prefix}_ppb",
+                    ""
+                ),
+                key=f"{sheet}_{prefix}_ppb"
+            )
 
         name_column, age_column = st.columns(2)
 
@@ -6345,15 +6232,21 @@ with payment_column:
     data["challan_amount"] = float(challan_amount)
     data["charges"] = float(charges)
 
-    # Automatically calculated from Challan + Charges.
-    total_payable = float(challan_amount) + float(charges)
+    # LIVE CALCULATIONS: always calculate from the values currently visible on screen.
+    challan_amount = float(challan_amount or 0.0)
+    charges = float(charges or 0.0)
+    total_payable = challan_amount + charges
 
-    st.number_input(
+    # Keep all current values synchronized immediately for saving/PDF/email.
+    data["challan_amount"] = challan_amount
+    data["charges"] = charges
+    data["total_payable"] = total_payable
+
+    # Fresh calculated display. No persistent key, so Streamlit cannot reuse an old value.
+    st.text_input(
         "TOTAL PAYABLE",
-        min_value=0.0,
-        value=float(total_payable),
-        disabled=True,
-        key=f"{sheet}_total_payable_display"
+        value=f"{total_payable:.2f}",
+        disabled=True
     )
 
     if st.button(
@@ -6546,19 +6439,29 @@ with payment_column:
 
         # Keep the live value in the current sheet data so totals and later saves
         # always use what is currently entered in the widgets.
-        payment["amount"] = float(amount)
-        payment["payment_mode"] = payment_mode
+        # Update the real payment record for this sheet immediately.
+        for _live_payment in data["payments"]:
+            if _live_payment.get("id") == payment_id:
+                _live_payment["amount"] = float(amount)
+                _live_payment["payment_mode"] = payment_mode
+                break
+
         payment_values.append(float(amount))
 
 
     # Calculate the totals LIVE from every visible payment row.
-    total_paid = sum(
-        payment_values
-    )
+    total_paid = sum(float(value or 0.0) for value in payment_values)
+
+    # Recalculate the complete chain from current screen values.
+    total_payable = float(challan_amount or 0.0) + float(charges or 0.0)
+    balance = total_payable - total_paid
 
     # Keep calculated values in the current sheet data as well.
+    data["challan_amount"] = float(challan_amount or 0.0)
+    data["charges"] = float(charges or 0.0)
     data["total_paid"] = float(total_paid)
     data["total_payable"] = float(total_payable)
+    data["balance_amount"] = float(balance)
 
 
     total_column, balance_column = (
@@ -6570,59 +6473,33 @@ with payment_column:
 
     with total_column:
 
-        st.number_input(
+        # Fresh calculated display: automatically sums every Amount Paid row.
+        st.text_input(
 
             "Total Amount Paid",
 
-            value=float(
-                total_paid
-            ),
+            value=f"{float(total_paid):.2f}",
 
-            disabled=True,
-
-            key=(
-
-                f"{sheet}_"
-
-                "total_paid_display"
-
-            )
+            disabled=True
 
         )
 
 
     with balance_column:
 
-        balance = (
-
-            total_payable
-
-            -
-
-            total_paid
-
-        )
-
+        # Already calculated above from the current Challan + Charges and all payments.
+        balance = float(balance)
 
         data["balance_amount"] = float(balance)
 
-        st.number_input(
+        # Fresh calculated display: Total Payable - Total Amount Paid.
+        st.text_input(
 
             "Balance Amount",
 
-            value=float(
-                balance
-            ),
+            value=f"{float(balance):.2f}",
 
-            disabled=True,
-
-            key=(
-
-                f"{sheet}_"
-
-                "balance_display"
-
-            )
+            disabled=True
 
         )
 
@@ -6828,33 +6705,32 @@ def _send_pdf_email(sheet_name, pdf_data, recipient_override=None):
 # =========================================================
 
 # =========================================================
-# SAVE + DOWNLOAD + PRINT ACTIONS
+# ALWAYS-VISIBLE PDF ACTIONS
 # =========================================================
+# Download and Print must always be visible. Build a fresh PDF from the
+# current sheet data on each page run instead of hiding the buttons until
+# a previously saved PDF file exists.
 
-# Keep the three actions together. If this sheet has already been saved,
-# use the existing PDF; otherwise build a temporary PDF from the current data
-# so Download/Print are still available without removing any existing features.
-_current_sheet_for_actions = st.session_state.get("current_sheet", sheet)
-_current_pdf_for_actions = st.session_state.get("saved_pdf", b"")
+_current_sheet_for_actions = sheet
 
-if (
-    not _current_pdf_for_actions
-    or st.session_state.get("saved_sheet") != _current_sheet_for_actions
-):
-    _pdf_file_for_actions = os.path.join(
-        PDF_FOLDER,
-        f"{_current_sheet_for_actions}.pdf"
+try:
+    _current_data_for_actions = st.session_state.database[sheet]
+    _current_pdf_for_actions = create_pdf(
+        _current_sheet_for_actions,
+        _current_data_for_actions
     )
-    if os.path.exists(_pdf_file_for_actions):
-        try:
-            with open(_pdf_file_for_actions, "rb") as _pdf_action_file:
-                _current_pdf_for_actions = _pdf_action_file.read()
-        except Exception:
-            _current_pdf_for_actions = b""
+except Exception:
+    _current_pdf_for_actions = b""
 
-_action_save_col, _action_download_col, _action_print_col = st.columns(3)
+_save_col, _download_col, _print_col = st.columns(3)
 
-with _action_download_col:
+with _save_col:
+    st.markdown(
+        '<div style="height:1px;"></div>',
+        unsafe_allow_html=True
+    )
+
+with _download_col:
     if _current_pdf_for_actions:
         st.download_button(
             "📄 DOWNLOAD PDF",
@@ -6862,81 +6738,59 @@ with _action_download_col:
             file_name=f"{_current_sheet_for_actions}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            key=f"download_pdf_near_save_{_current_sheet_for_actions}"
+            key=f"download_pdf_visible_{_current_sheet_for_actions}"
         )
     else:
         st.button(
             "📄 DOWNLOAD PDF",
             disabled=True,
             use_container_width=True,
-            key=f"download_pdf_disabled_{_current_sheet_for_actions}",
-            help="Save the file once to generate the PDF."
+            key=f"download_pdf_visible_disabled_{_current_sheet_for_actions}"
         )
 
-with _action_print_col:
+with _print_col:
     if _current_pdf_for_actions:
-        # Use a Blob URL instead of a huge data: URL. Some browsers open large
-        # PDF data URLs as blank pages, which was causing the blank print window.
         _print_b64 = base64.b64encode(
             _current_pdf_for_actions
         ).decode("utf-8")
 
         _print_html = f"""
         <html>
-        <body style="margin:0;padding:0;">
-            <button id="printBtn" style="
-                width:100%;
-                border:none;
-                border-radius:8px;
-                padding:0.62rem 0.8rem;
-                font-size:14px;
-                font-weight:700;
-                cursor:pointer;
-                background:#16a34a;
-                color:white;
-            ">🖨️ PRINT DOCUMENT</button>
-
-            <script>
-            document.getElementById("printBtn").addEventListener("click", function() {{
-                try {{
-                    const base64 = "{_print_b64}";
-                    const binary = atob(base64);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) {{
-                        bytes[i] = binary.charCodeAt(i);
-                    }}
-
-                    const blob = new Blob([bytes], {{
-                        type: "application/pdf"
-                    }});
-                    const url = URL.createObjectURL(blob);
-
-                    const printWindow = window.open(url, "_blank");
-                    if (printWindow) {{
-                        setTimeout(function() {{
-                            try {{
-                                printWindow.focus();
-                                printWindow.print();
-                            }} catch (e) {{
-                                console.error(e);
-                            }}
-                        }}, 1200);
-                    }} else {{
-                        alert("Please allow pop-ups to print the document.");
-                    }}
-                }} catch (err) {{
-                    console.error(err);
-                    alert("Unable to prepare the document for printing.");
-                }}
-            }});
-            </script>
+        <body style="margin:0;">
+        <button id="print_document_button" style="
+            width:100%;
+            padding:0.62rem 0.8rem;
+            border:none;
+            border-radius:8px;
+            font-weight:700;
+            cursor:pointer;
+        ">🖨️ PRINT DOCUMENT</button>
+        <script>
+        document.getElementById("print_document_button").onclick = function() {{
+            const binary = atob("{_print_b64}");
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {{
+                bytes[i] = binary.charCodeAt(i);
+            }}
+            const blob = new Blob([bytes], {{type:"application/pdf"}});
+            const url = URL.createObjectURL(blob);
+            const win = window.open(url, "_blank");
+            if (win) {{
+                win.onload = function() {{
+                    try {{ win.print(); }} catch(e) {{}}
+                }};
+            }} else {{
+                alert("Please allow pop-ups to print the document.");
+            }}
+        }};
+        </script>
         </body>
         </html>
         """
 
         st.components.v1.html(
             _print_html,
-            height=52,
+            height=55,
             scrolling=False
         )
     else:
@@ -6944,93 +6798,144 @@ with _action_print_col:
             "🖨️ PRINT DOCUMENT",
             disabled=True,
             use_container_width=True,
-            key=f"print_pdf_disabled_{_current_sheet_for_actions}",
-            help="Save the file once to generate the PDF."
+            key=f"print_pdf_visible_disabled_{_current_sheet_for_actions}"
         )
 
-with _action_save_col:
-    if st.button(
-        "💾 SAVE FILE",
-        type="primary",
-        use_container_width=True,
-        key=(
-            f"{sheet}_"
-            "save_file"
+
+
+if st.button(
+
+    "💾 SAVE FILE",
+
+    type="primary",
+
+    use_container_width=True,
+
+    key=(
+
+        f"{sheet}_"
+
+        "save_file"
+
+    )
+
+):
+
+    collect_data()
+
+
+    data = (
+
+        st.session_state.database[
+
+            sheet
+
+        ]
+
+    )
+
+
+    calculated_extent, invalid = (
+
+        total_extent(
+
+            data["surveys"]
+
         )
-    ):
 
-        collect_data()
+    )
 
-        data = (
-            st.session_state.database[
-                sheet
-            ]
+
+    if invalid:
+
+        st.error(
+
+            "The file was not saved. "
+
+            "Correct the invalid "
+
+            "extent first."
+
         )
 
-        calculated_extent, invalid = (
-            total_extent(
-                data["surveys"]
+
+    else:
+
+        data["saved"] = True
+
+
+        save_database()
+
+
+        pdf_bytes = (
+
+            create_pdf(
+
+                sheet,
+
+                data
+
             )
+
         )
 
-        if invalid:
 
-            st.error(
-                "The file was not saved. "
-                "Correct the invalid "
-                "extent first."
+        pdf_path = (
+
+            os.path.join(
+
+                PDF_FOLDER,
+
+                f"{sheet}.pdf"
+
             )
 
+        )
+
+
+        with open(
+
+            pdf_path,
+
+            "wb"
+
+        ) as pdf_file:
+
+            pdf_file.write(
+
+                pdf_bytes
+
+            )
+
+
+        st.session_state[
+
+            "saved_pdf"
+
+        ] = pdf_bytes
+
+
+        st.session_state[
+
+            "saved_sheet"
+
+        ] = sheet
+
+
+        st.session_state[
+
+            "show_saved_options"
+
+        ] = True
+
+
+        # Automatically send the generated PDF to the configured email on every save.
+        email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
+
+        if email_ok:
+            st.success(f"{sheet} saved successfully. {email_message}")
         else:
-
-            data["saved"] = True
-
-            save_database()
-
-            pdf_bytes = (
-                create_pdf(
-                    sheet,
-                    data
-                )
-            )
-
-            pdf_path = (
-                os.path.join(
-                    PDF_FOLDER,
-                    f"{sheet}.pdf"
-                )
-            )
-
-            with open(
-                pdf_path,
-                "wb"
-            ) as pdf_file:
-
-                pdf_file.write(
-                    pdf_bytes
-                )
-
-            st.session_state[
-                "saved_pdf"
-            ] = pdf_bytes
-
-            st.session_state[
-                "saved_sheet"
-            ] = sheet
-
-            st.session_state[
-                "show_saved_options"
-            ] = True
-
-            # Automatically send the generated PDF to the configured email on every save.
-            email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
-
-            if email_ok:
-                st.success(f"{sheet} saved successfully. {email_message}")
-            else:
-                st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
-
-            st.rerun()
+            st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
 
 
 # =========================================================
@@ -7078,8 +6983,8 @@ if st.session_state.get(
         # Open the next empty sheet in a completely separate browser tab.
         # The current saved sheet and its session data are left untouched.
         st.markdown(
-            f"""
-            <a href="./?new_sheet=1&auth={_current_auth_token()}"
+            """
+            <a href="./?new_sheet=1"
                target="_blank"
                rel="noopener noreferrer"
                style="
@@ -7100,16 +7005,3 @@ if st.session_state.get(
             """,
             unsafe_allow_html=True
         )
-
-
-# =========================================================
-# AUTO-PERSIST CURRENT IN-PROGRESS SHEET
-# =========================================================
-try:
-    collect_data()
-    save_database()
-except Exception:
-    # Do not interrupt existing UI/actions if a widget is temporarily absent
-    # during a document-type/layout change.
-    pass
-
