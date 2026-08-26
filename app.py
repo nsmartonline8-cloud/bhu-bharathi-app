@@ -27,7 +27,7 @@ from reportlab.platypus import (
     Table,
     TableStyle
 )
-
+st.caption("APP VERSION: PAYMENT FIX TEST 2026")
 def load_css():
     css_file = Path(__file__).parent / "style.css"
 
