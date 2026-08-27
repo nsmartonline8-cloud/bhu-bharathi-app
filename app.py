@@ -3975,6 +3975,18 @@ st.markdown(
 )
 
 
+# TXN NO. is common to every document type and appears directly below the document heading.
+st.text_input(
+
+    "TXN NO.",
+
+    value=data.get("transaction_number", ""),
+
+    key=f"{sheet}_transaction_number"
+
+)
+
+
 # =========================================================
 # REUSABLE PERSON FORM
 # =========================================================
@@ -4015,33 +4027,15 @@ def person_form(
         )
 
 
-        name_col, txn_col = st.columns(2)
+        st.text_input(
 
+            "BANK NAME",
 
-        with name_col:
+            value=data.get(f"{prefix}_name", ""),
 
-            st.text_input(
+            key=f"{sheet}_{prefix}_name"
 
-                "BANK NAME",
-
-                value=data.get(f"{prefix}_name", ""),
-
-                key=f"{sheet}_{prefix}_name"
-
-            )
-
-
-        with txn_col:
-
-            st.text_input(
-
-                "TXN No.",
-
-                value=data.get("transaction_number", ""),
-
-                key=f"{sheet}_transaction_number"
-
-            )
+        )
 
 
         cin_col, gstin_col = st.columns(2)
