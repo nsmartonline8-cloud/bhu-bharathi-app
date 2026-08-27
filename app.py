@@ -1789,7 +1789,10 @@ def search_files(
 
         "second_family_aadhaar",
 
-        "second_family_cell"
+        "second_family_cell",
+
+        # Search by TXN No. as well
+        "transaction_number"
 
     ]
 
@@ -3858,7 +3861,7 @@ with search_column:
 
             placeholder=(
 
-                "Name, cell, Aadhaar "
+                "Name, cell, Aadhaar, TXN No. "
 
                 "or NS-0001"
 

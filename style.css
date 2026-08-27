@@ -418,3 +418,28 @@ h6 a,
 a[href^="#"] {
     display: none !important;
 }
+
+
+/* =====================================================
+   LOGIN PASSWORD EYE — KEEP SHOW/HIDE ICON BLACK
+   ===================================================== */
+
+/* Streamlit/BaseWeb password visibility buttons */
+button[aria-label*="show password" i],
+button[aria-label*="hide password" i],
+button[title*="show password" i],
+button[title*="hide password" i] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+}
+
+/* The eye SVG itself */
+button[aria-label*="show password" i] svg,
+button[aria-label*="hide password" i] svg,
+button[title*="show password" i] svg,
+button[title*="hide password" i] svg {
+    fill: #000000 !important;
+    stroke: #000000 !important;
+    color: #000000 !important;
+}
