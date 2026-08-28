@@ -1011,8 +1011,10 @@ def migrate_json_to_supabase():
             f"Migration error: {error}"
         )
 
-migrate_json_to_supabase()
-
+# Legacy JSON migration is intentionally disabled.
+# Supabase is now the only source of sheet data.
+# Do NOT automatically re-import old test data from bhu_bharathi_data.json.
+# migrate_json_to_supabase()
 
 # =========================================================
 # DATABASE MEMORY
@@ -1131,9 +1133,8 @@ if new_sheet_request == "1":
         st.session_state.database[new_sheet_name] = empty_file()
         save_database()
     st.session_state.current_sheet = new_sheet_name
-    # Convert the temporary ?new_sheet=1 URL into the permanent sheet URL.
-    # Do not clear all query parameters: preserve authentication and remove only
-    # the one-time new_sheet flag so refresh cannot create another sheet.
+    # Convert the one-time new-sheet request into the permanent sheet URL.
+    # Remove ONLY new_sheet; preserve auth and other needed query parameters.
     st.query_params.pop("new_sheet", None)
     st.query_params["sheet"] = new_sheet_name
     st.rerun()
