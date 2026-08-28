@@ -1011,10 +1011,7 @@ def migrate_json_to_supabase():
             f"Migration error: {error}"
         )
 
-# IMPORTANT: Automatic JSON migration is intentionally disabled.
-# The Supabase table is now the source of truth. This prevents old test
-# sheets from being re-imported after the Supabase table has been cleared.
-# migrate_json_to_supabase()
+migrate_json_to_supabase()
 
 
 # =========================================================
@@ -1134,9 +1131,12 @@ if new_sheet_request == "1":
         st.session_state.database[new_sheet_name] = empty_file()
         save_database()
     st.session_state.current_sheet = new_sheet_name
-    # Change the URL to the real sheet so refreshing does not create another one.
-    st.query_params.clear()
+    # Convert the temporary ?new_sheet=1 URL into the permanent sheet URL.
+    # Do not clear all query parameters: preserve authentication and remove only
+    # the one-time new_sheet flag so refresh cannot create another sheet.
+    st.query_params.pop("new_sheet", None)
     st.query_params["sheet"] = new_sheet_name
+    st.rerun()
 
 requested_sheet = st.query_params.get("sheet", "")
 if isinstance(requested_sheet, list):
