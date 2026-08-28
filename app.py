@@ -1203,9 +1203,16 @@ if (
 ):
     st.session_state.current_sheet = requested_sheet
 
-# No sheet requested and no current session sheet: open/create the first current sheet.
+# No sheet requested and no current session sheet: restore the latest existing
+# sheet for this user. Only create NS-0001 when this user has no sheets at all.
 elif "current_sheet" not in st.session_state:
-    st.session_state.current_sheet = next_sheet()
+    if st.session_state.database:
+        st.session_state.current_sheet = max(
+            st.session_state.database.keys(),
+            key=sheet_value
+        )
+    else:
+        st.session_state.current_sheet = "NS-0001"
 
 # Ensure the selected sheet exists.
 if st.session_state.current_sheet not in st.session_state.database:
