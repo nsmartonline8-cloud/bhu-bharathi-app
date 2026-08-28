@@ -1121,46 +1121,67 @@ def next_sheet():
 # CURRENT SHEET / DIRECT SHEET URL
 # =========================================================
 
-# A saved sheet opened in a new tab uses a URL like ?sheet=NS-0001.
-# A new empty sheet opened in another tab uses ?new_sheet=1.
-new_sheet_request = str(st.query_params.get("new_sheet", "")).strip()
-if new_sheet_request == "1":
-    # This code runs only in the newly opened tab.
-    # Reload the shared database so we use the latest sheet number.
-    st.session_state.database = load_database()
-    new_sheet_name = next_sheet()
-    if new_sheet_name not in st.session_state.database:
-        st.session_state.database[new_sheet_name] = empty_file()
-        save_database()
-    st.session_state.current_sheet = new_sheet_name
-    # Convert the one-time new-sheet request into the permanent sheet URL.
-    # Remove ONLY new_sheet; preserve auth and other needed query parameters.
-    st.query_params.pop("new_sheet", None)
-    st.query_params["sheet"] = new_sheet_name
-    st.rerun()
+# A saved sheet uses a URL like ?sheet=NS-0001.
+# A NEW EMPTY SHEET link temporarily uses ?new_sheet=1.
+#
+# IMPORTANT REFRESH RULE:
+# A real sheet URL ALWAYS wins. Therefore a refresh can never create a new
+# sheet merely because a stale new_sheet parameter is present.
 
 requested_sheet = st.query_params.get("sheet", "")
 if isinstance(requested_sheet, list):
     requested_sheet = requested_sheet[0] if requested_sheet else ""
 requested_sheet = str(requested_sheet).strip().upper()
 
+new_sheet_request = str(st.query_params.get("new_sheet", "")).strip()
+
+# Create a sheet ONLY for a genuine new-sheet request with no existing sheet.
+if new_sheet_request == "1" and not requested_sheet:
+
+    # Reload Supabase first so the number is based on the latest real database.
+    st.session_state.database = load_database()
+
+    new_sheet_name = next_sheet()
+
+    if new_sheet_name not in st.session_state.database:
+        st.session_state.database[new_sheet_name] = empty_file()
+        save_database()
+
+    st.session_state.current_sheet = new_sheet_name
+
+    # Build the permanent URL in one operation.
+    # Preserve authentication parameters, remove ONLY new_sheet, and add sheet.
+    permanent_params = dict(st.query_params)
+    permanent_params.pop("new_sheet", None)
+    permanent_params["sheet"] = new_sheet_name
+    st.query_params.from_dict(permanent_params)
+
+    # Stop this temporary new-sheet run. The next run opens the same real sheet.
+    st.rerun()
+
+# Existing sheet: restore exactly that sheet.
 if (
     requested_sheet
     and requested_sheet in st.session_state.database
 ):
     st.session_state.current_sheet = requested_sheet
+
+# No sheet requested and no current session sheet: open/create the first current sheet.
 elif "current_sheet" not in st.session_state:
     st.session_state.current_sheet = next_sheet()
 
+# Ensure the selected sheet exists.
 if st.session_state.current_sheet not in st.session_state.database:
     st.session_state.database[st.session_state.current_sheet] = empty_file()
     save_database()
 
-# Keep the active sheet in the URL even before the user presses SAVE.
-# This makes a browser refresh reopen the exact same draft instead of
-# starting a different new sheet.
-if not requested_sheet:
-    st.query_params["sheet"] = st.session_state.current_sheet
+# Always keep the REAL current sheet in the URL.
+# This is the refresh anchor: refresh -> same sheet -> same saved data.
+if requested_sheet != st.session_state.current_sheet:
+    stable_params = dict(st.query_params)
+    stable_params.pop("new_sheet", None)
+    stable_params["sheet"] = st.session_state.current_sheet
+    st.query_params.from_dict(stable_params)
 
 
 # =========================================================
