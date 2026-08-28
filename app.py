@@ -224,6 +224,58 @@ def _check_login(username, password):
     return _check_user_account(username, password)
 
 
+def _auth_token_secret():
+    try:
+        secret_password = st.secrets.get("auth", {}).get("password")
+    except Exception:
+        secret_password = None
+    if secret_password:
+        return str(secret_password)
+    auth = _load_local_auth() or {}
+    return str(auth.get("password_hash", "nsmart-local-auth"))
+
+
+def _make_auth_token(username, role, full_name):
+    payload = json.dumps({
+        "u": str(username),
+        "r": str(role),
+        "n": str(full_name)
+    }, separators=(",", ":"))
+    encoded = base64.urlsafe_b64encode(payload.encode("utf-8")).decode("utf-8")
+    signature = hmac.new(
+        _auth_token_secret().encode("utf-8"),
+        encoded.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _restore_auth_from_token():
+    token = str(st.query_params.get("auth", "")).strip()
+    if not token or "." not in token:
+        return False
+    try:
+        encoded, signature = token.rsplit(".", 1)
+        expected = hmac.new(
+            _auth_token_secret().encode("utf-8"),
+            encoded.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            return False
+        payload = json.loads(base64.urlsafe_b64decode(encoded.encode("utf-8")).decode("utf-8"))
+        username = str(payload.get("u", "")).strip().upper()
+        if not username:
+            return False
+        st.session_state.nsmart_authenticated = True
+        st.session_state.nsmart_login_user = username
+        st.session_state.nsmart_login_role = str(payload.get("r", "USER"))
+        st.session_state.nsmart_login_name = str(payload.get("n", ""))
+        return True
+    except Exception:
+        return False
+
+
 def show_login_screen():
     st.markdown(
         """
@@ -349,6 +401,11 @@ def show_login_screen():
             st.session_state.nsmart_login_user = account["username"]
             st.session_state.nsmart_login_role = account.get("role", "USER")
             st.session_state.nsmart_login_name = account.get("full_name", "")
+            st.query_params["auth"] = _make_auth_token(
+                account["username"],
+                account.get("role", "USER"),
+                account.get("full_name", "")
+            )
             st.rerun()
         else:
             st.error("Incorrect username or password, or your account is not approved.")
@@ -358,6 +415,9 @@ def show_login_screen():
 
 if "nsmart_authenticated" not in st.session_state:
     st.session_state.nsmart_authenticated = False
+
+if not st.session_state.nsmart_authenticated:
+    _restore_auth_from_token()
 
 
 # =========================================================
@@ -614,6 +674,8 @@ def empty_file():
 
         "first_age": 0,
 
+        "first_birth_year": 0,
+
         "first_dod": "",
 
         "successor_count": 1,
@@ -690,6 +752,8 @@ def empty_file():
         "second_name": "",
 
         "second_age": 0,
+
+        "second_birth_year": 0,
 
         "second_relation": "S/o",
 
@@ -1079,7 +1143,6 @@ requested_sheet = str(requested_sheet).strip().upper()
 if (
     requested_sheet
     and requested_sheet in st.session_state.database
-    and st.session_state.database[requested_sheet].get("saved", False)
 ):
     st.session_state.current_sheet = requested_sheet
 elif "current_sheet" not in st.session_state:
@@ -1348,6 +1411,8 @@ def collect_data():
 
         "first_age",
 
+        "first_birth_year",
+
         "first_dod",
 
         "first_relation",
@@ -1419,6 +1484,8 @@ def collect_data():
         "second_name",
 
         "second_age",
+
+        "second_birth_year",
 
         "second_relation",
 
@@ -3419,6 +3486,7 @@ with st.sidebar:
             st.session_state.nsmart_confirm_logout = False
             for _key in ("nsmart_login_user", "nsmart_login_role", "nsmart_login_name"):
                 st.session_state.pop(_key, None)
+            st.query_params.pop("auth", None)
             st.rerun()
 
         if logout_no.button("NO, STAY LOGGED IN", use_container_width=True, key="confirm_logout_no"):
@@ -4626,11 +4694,24 @@ def person_form(
         # SUCCESSION — PREDECESSOR
         st.text_input("PPB No.", value=data.get("first_ppb", ""), key=f"{sheet}_first_ppb")
 
-        name_column, age_column, dod_column = st.columns(3)
+        name_column, birth_column, age_column, dod_column = st.columns(4)
         with name_column:
             st.text_input("Predecessor Name", value=data.get("first_name", ""), key=f"{sheet}_first_name")
+        with birth_column:
+            current_year = date.today().year
+            birth_year = st.number_input(
+                "Birth Year", min_value=0, max_value=current_year,
+                value=int(data.get("first_birth_year", 0)), key=f"{sheet}_first_birth_year"
+            )
         with age_column:
-            st.number_input("Age", min_value=0, max_value=120, value=int(data.get("first_age", 0)), key=f"{sheet}_first_age")
+            if birth_year > 0:
+                calculated_age = max(0, current_year - int(birth_year))
+                data["first_age"] = calculated_age
+                age_display_key = f"{sheet}_first_age_display"
+                st.session_state[age_display_key] = f"{calculated_age} years"
+                st.text_input("Age", key=age_display_key, disabled=True)
+            else:
+                st.number_input("Age", min_value=0, max_value=120, value=int(data.get("first_age", 0)), key=f"{sheet}_first_age")
         with dod_column:
             saved_dod = data.get("first_dod", "")
             try:
@@ -4641,7 +4722,7 @@ def person_form(
 
     else:
 
-        name_column, age_column = st.columns(2)
+        name_column, birth_column, age_column = st.columns(3)
 
         with name_column:
             st.text_input(
@@ -4653,19 +4734,29 @@ def person_form(
                 key=f"{sheet}_{prefix}_name"
             )
 
-        with age_column:
-            st.number_input(
-                "Age",
+        current_year = date.today().year
+        with birth_column:
+            birth_year = st.number_input(
+                "Birth Year",
                 min_value=0,
-                max_value=120,
-                value=int(
-                    data.get(
-                        f"{prefix}_age",
-                        0
-                    )
-                ),
-                key=f"{sheet}_{prefix}_age"
+                max_value=current_year,
+                value=int(data.get(f"{prefix}_birth_year", 0)),
+                key=f"{sheet}_{prefix}_birth_year"
             )
+
+        with age_column:
+            if birth_year > 0:
+                calculated_age = max(0, current_year - int(birth_year))
+                data[f"{prefix}_age"] = calculated_age
+                age_display_key = f"{sheet}_{prefix}_age_display"
+                st.session_state[age_display_key] = f"{calculated_age} years"
+                st.text_input("Age", key=age_display_key, disabled=True)
+            else:
+                st.number_input(
+                    "Age", min_value=0, max_value=120,
+                    value=int(data.get(f"{prefix}_age", 0)),
+                    key=f"{sheet}_{prefix}_age"
+                )
     if not (selected_document == "SUCCESSION" and prefix == "first"):
 
         relation_options = [
@@ -6761,6 +6852,14 @@ st.divider()
 # =========================================================
 # FINAL ACTIONS
 # =========================================================
+
+# =========================================================
+# AUTO-SAVE CURRENT DRAFT
+# Keeps the current sheet and entered details available after a refresh.
+# =========================================================
+collect_data()
+save_database()
+
 
 st.markdown(
     '<div class="section-title">💾 SAVE & DOCUMENT ACTIONS</div>',
