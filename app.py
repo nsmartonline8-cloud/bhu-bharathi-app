@@ -1011,7 +1011,10 @@ def migrate_json_to_supabase():
             f"Migration error: {error}"
         )
 
-migrate_json_to_supabase()
+# IMPORTANT: Automatic JSON migration is intentionally disabled.
+# The Supabase table is now the source of truth. This prevents old test
+# sheets from being re-imported after the Supabase table has been cleared.
+# migrate_json_to_supabase()
 
 
 # =========================================================
