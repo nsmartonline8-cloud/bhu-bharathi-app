@@ -1152,6 +1152,12 @@ if st.session_state.current_sheet not in st.session_state.database:
     st.session_state.database[st.session_state.current_sheet] = empty_file()
     save_database()
 
+# Keep the active sheet in the URL even before the user presses SAVE.
+# This makes a browser refresh reopen the exact same draft instead of
+# starting a different new sheet.
+if not requested_sheet:
+    st.query_params["sheet"] = st.session_state.current_sheet
+
 
 # =========================================================
 # HELPERS
