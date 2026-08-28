@@ -106,44 +106,93 @@ def _save_local_auth(password):
         json.dump(payload, f, indent=2)
 
 
+def _accounts_supabase():
+    # Login/signup is shown before the main database section runs, so use a
+    # lazy Supabase client here instead of relying on the later global client.
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
+
+
 def _load_accounts():
-    if not ACCOUNTS_FILE.exists():
-        return {}
     try:
-        with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        response = (
+            _accounts_supabase()
+            .table("accounts")
+            .select("username, full_name, role, active, salt, password_hash")
+            .execute()
+        )
+        accounts = {}
+        for row in (response.data or []):
+            username = str(row.get("username", "")).strip().upper()
+            if username:
+                row["username"] = username
+                accounts[username] = row
+        return accounts
     except Exception:
         return {}
 
 
 def _save_accounts(accounts):
-    with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(accounts, f, indent=2)
+    # Accounts are stored in Supabase. This helper keeps compatibility with
+    # the existing password-management code when a full account dictionary is
+    # passed back after editing one user.
+    try:
+        rows = []
+        for username, account in accounts.items():
+            rows.append({
+                "username": str(username).strip().upper(),
+                "full_name": str(account.get("full_name", "")).strip(),
+                "role": str(account.get("role", "USER")).upper(),
+                "active": bool(account.get("active", True)),
+                "salt": str(account.get("salt", "")),
+                "password_hash": str(account.get("password_hash", ""))
+            })
+        if rows:
+            (
+                _accounts_supabase()
+                .table("accounts")
+                .upsert(rows, on_conflict="username")
+                .execute()
+            )
+    except Exception as error:
+        raise RuntimeError(f"Account saving error: {error}")
 
 
 def _create_account(username, password, full_name="", email="", role="USER"):
-    accounts = _load_accounts()
     username = str(username).strip().upper()
     if not username:
         return False, "Username is required."
-    if username in accounts or username == LOGIN_USERNAME:
-        return False, "This username already exists."
+    if not re.fullmatch(r"[A-Z0-9_.-]{3,30}", username):
+        return False, "Username must be 3-30 characters and use only letters, numbers, dot, underscore or hyphen."
+    if username == LOGIN_USERNAME:
+        return False, "This username is reserved."
     if len(password) < 8:
         return False, "Password must contain at least 8 characters."
-    salt = secrets.token_hex(16)
-    accounts[username] = {
-        "username": username,
-        "full_name": str(full_name).strip(),
-        "email": str(email).strip(),
-        "role": role,
-        "active": True,
-        "salt": salt,
-        "password_hash": _hash_password(password, salt),
-    }
-    _save_accounts(accounts)
-    return True, "Account created successfully."
 
+    accounts = _load_accounts()
+    if username in accounts:
+        return False, "This username already exists."
+
+    salt = secrets.token_hex(16)
+    try:
+        (
+            _accounts_supabase()
+            .table("accounts")
+            .insert({
+                "username": username,
+                "full_name": str(full_name).strip(),
+                "role": str(role).upper(),
+                "active": True,
+                "salt": salt,
+                "password_hash": _hash_password(password, salt)
+            })
+            .execute()
+        )
+        return True, "Account created successfully."
+    except Exception as error:
+        return False, f"Could not create account: {error}"
 
 def _check_user_account(username, password):
     account = _load_accounts().get(str(username).strip().upper())
@@ -394,6 +443,28 @@ def show_login_screen():
             password = st.text_input("Password", type="password", placeholder="Enter your password")
             login = st.form_submit_button("🔐 LOGIN TO N-SMART", use_container_width=True, type="primary")
 
+    signup_left, signup_center, signup_right = st.columns([1.5, 1, 1.5])
+    with signup_center:
+        with st.expander("➕ NEW USER? CREATE AN ACCOUNT"):
+            with st.form("nsmart_signup_form", clear_on_submit=True):
+                signup_username = st.text_input("Choose Username", placeholder="3-30 characters")
+                signup_password = st.text_input("Choose Password", type="password")
+                signup_confirm = st.text_input("Confirm Password", type="password")
+                signup_submit = st.form_submit_button("CREATE ACCOUNT", use_container_width=True)
+
+            if signup_submit:
+                if signup_password != signup_confirm:
+                    st.error("Passwords do not match.")
+                else:
+                    ok, message = _create_account(
+                        signup_username,
+                        signup_password
+                    )
+                    if ok:
+                        st.success("Account created successfully. You can now log in with your new username and password.")
+                    else:
+                        st.error(message)
+
     if login:
         account = _check_login(username, password)
         if account:
@@ -421,61 +492,13 @@ if not st.session_state.nsmart_authenticated:
 
 
 # =========================================================
-# DASHBOARD SAVED-SHEET OPEN ACCESS
+# AUTHENTICATION GATE
 # =========================================================
-# Saved sheets opened from Dashboard/Search open in a new tab. A new browser
-# tab has a fresh Streamlit session, so it would normally show the login page
-# again. Only links explicitly created by the Dashboard/Search use
-# dashboard_open=1. For those links, allow direct viewing only when the
-# requested sheet exists and is already marked as saved.
-_dashboard_sheet_request = str(
-    st.query_params.get("sheet", "")
-).strip().upper()
-
-_dashboard_open_request = str(
-    st.query_params.get("dashboard_open", "")
-).strip()
-
-_dashboard_saved_sheet_access = False
-
-if (
-    _dashboard_open_request == "1"
-    and _dashboard_sheet_request
-):
-    try:
-        _dashboard_data_file = "bhu_bharathi_data.json"
-        if os.path.exists(_dashboard_data_file):
-            with open(
-                _dashboard_data_file,
-                "r",
-                encoding="utf-8"
-            ) as _dashboard_file:
-                _dashboard_database = json.load(_dashboard_file)
-
-            _dashboard_sheet_data = (
-                _dashboard_database.get(
-                    _dashboard_sheet_request,
-                    {}
-                )
-            )
-
-            _dashboard_saved_sheet_access = bool(
-                _dashboard_sheet_data.get(
-                    "saved",
-                    False
-                )
-            )
-    except Exception:
-        _dashboard_saved_sheet_access = False
-
-
-if (
-    not st.session_state.nsmart_authenticated
-    and not _dashboard_saved_sheet_access
-):
+# Every sheet, dashboard and search result requires the authenticated account.
+# This prevents another user from opening a sheet by manually changing a URL.
+if not st.session_state.nsmart_authenticated:
     show_login_screen()
     st.stop()
-
 
 DATA_FILE = "bhu_bharathi_data.json"
 
@@ -888,7 +911,15 @@ supabase = create_client(
 )
 
 
+def _current_owner():
+    return str(st.session_state.get("nsmart_login_user", "")).strip().upper()
+
+
 def load_database():
+
+    owner = _current_owner()
+    if not owner:
+        return {}
 
     try:
 
@@ -896,12 +927,13 @@ def load_database():
             supabase
             .table("sheets")
             .select("sheet_id, data")
+            .eq("owner_username", owner)
             .execute()
         )
 
         database = {}
 
-        for row in response.data:
+        for row in response.data or []:
 
             sheet_id = row.get("sheet_id")
             sheet_data = row.get("data")
@@ -923,6 +955,10 @@ def load_database():
 
 def save_database():
 
+    owner = _current_owner()
+    if not owner:
+        return
+
     try:
 
         rows = []
@@ -933,6 +969,7 @@ def save_database():
 
             rows.append(
                 {
+                    "owner_username": owner,
                     "sheet_id": sheet_id,
                     "data": sheet_data
                 }
@@ -945,7 +982,7 @@ def save_database():
                 .table("sheets")
                 .upsert(
                     rows,
-                    on_conflict="sheet_id"
+                    on_conflict="owner_username,sheet_id"
                 )
                 .execute()
             )
