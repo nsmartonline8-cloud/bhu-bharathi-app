@@ -2079,6 +2079,20 @@ def create_pdf(
     address_style.wordWrap = "LTR"
     address_style.splitLongWords = 0
 
+    # Compact value style for relation/direction fields. These fields must
+    # remain in their existing single boxes and wrap at whole-word boundaries.
+    detail_style = styles["Normal"].clone("DetailCell")
+    detail_style.fontSize = 7.2
+    detail_style.leading = 8.5
+    detail_style.wordWrap = "LTR"
+    detail_style.splitLongWords = 0
+
+    def detail_cell(value):
+        text = pdf_text(value or "").strip()
+        if not text:
+            return Paragraph("", detail_style)
+        return Paragraph(text.replace("\n", "<br/>"), detail_style)
+
     def address_cell(value):
         text = pdf_text(value or "").strip()
         if not text:
@@ -2790,10 +2804,10 @@ def create_pdf(
         person_rows,
 
         colWidths=[
-            55,
-            220,
-            55,
-            220
+            52,
+            223,
+            52,
+            224
         ]
 
     )
@@ -3288,7 +3302,7 @@ def create_pdf(
             "Notes",
             Paragraph(notes_text if notes_text else "", address_style)
         ]],
-        colWidths=[65, 486]
+        colWidths=[60, 491]
     )
     notes_table.setStyle(
         TableStyle(
