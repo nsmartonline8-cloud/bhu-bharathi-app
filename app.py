@@ -7240,7 +7240,7 @@ if st.session_state.get(
         # Open the next empty sheet in a completely separate browser tab.
         # The current saved sheet and its session data are left untouched.
         st.markdown(
-            """
+            f"""
             <a href="./?new_sheet=1&auth={st.query_params.get("auth", "")}"
                target="_blank"
                rel="noopener noreferrer"
