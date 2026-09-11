@@ -2040,7 +2040,7 @@ def create_pdf(
 
         output,
 
-        pagesize=(A4[1], A4[0]),
+        pagesize=A4,
         leftMargin=22,
         rightMargin=22,
         topMargin=18,
@@ -2077,15 +2077,17 @@ def create_pdf(
     address_style.fontSize = 7.2
     address_style.leading = 9
     address_style.wordWrap = "LTR"
+    address_style.splitLongWords = 0
 
     def address_cell(value):
         text = pdf_text(value or "").strip()
         if not text:
             return Paragraph("", address_style)
-        # Keep every word intact. Comma/newline-separated address components
-        # are placed on separate lines; normal long lines wrap automatically.
-        text = re.sub(r"\\s*[,;]\\s*", "<br/>", text)
-        text = text.replace("\\n", "<br/>").replace("\\r", "")
+
+        # Preserve words completely. Existing new lines and address
+        # separators become line breaks; ReportLab then wraps at spaces.
+        text = re.sub(r"\s*[,;]\s*", "<br/>", text)
+        text = text.replace("\n", "<br/>").replace("\r", "")
         return Paragraph(text, address_style)
 
 
@@ -2782,10 +2784,10 @@ def create_pdf(
         person_rows,
 
         colWidths=[
-            62,
-            213,
-            62,
-            213
+            58,
+            218,
+            58,
+            218
         ]
 
     )
