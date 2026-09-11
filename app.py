@@ -2079,20 +2079,6 @@ def create_pdf(
     address_style.wordWrap = "LTR"
     address_style.splitLongWords = 0
 
-    # Compact value style for relation/direction fields. These fields must
-    # remain in their existing single boxes and wrap at whole-word boundaries.
-    detail_style = styles["Normal"].clone("DetailCell")
-    detail_style.fontSize = 7.2
-    detail_style.leading = 8.5
-    detail_style.wordWrap = "LTR"
-    detail_style.splitLongWords = 0
-
-    def detail_cell(value):
-        text = pdf_text(value or "").strip()
-        if not text:
-            return Paragraph("", detail_style)
-        return Paragraph(text.replace("\n", "<br/>"), detail_style)
-
     def address_cell(value):
         text = pdf_text(value or "").strip()
         if not text:
@@ -2109,6 +2095,20 @@ def create_pdf(
         safe_parts = [pdf_text(part) for part in parts]
         wrapped = "<br/>".join(safe_parts)
         return Paragraph(wrapped, address_style)
+
+    # Long value cells need Paragraphs so ReportLab wraps at word boundaries
+    # instead of letting text visually run through the next cell.
+    detail_style = styles["Normal"].clone("DetailCell")
+    detail_style.fontSize = 7.0
+    detail_style.leading = 8.2
+    detail_style.wordWrap = "LTR"
+    detail_style.splitLongWords = 0
+
+    def detail_cell(value):
+        text = pdf_text(value or "").strip()
+        if not text:
+            return Paragraph("", detail_style)
+        return Paragraph(text.replace("\n", "<br/>"), detail_style)
 
 
     story = []
@@ -2450,7 +2450,7 @@ def create_pdf(
 
                 "Relation Name",
 
-                pdf_text(data.get("first_relation_name", "")),
+                detail_cell(data.get("first_relation_name", "")),
 
                 "PAN No.",
 
@@ -2716,7 +2716,7 @@ def create_pdf(
 
                 "Relation Name",
 
-                pdf_text(data.get("second_relation_name", ""))
+                detail_cell(data.get("second_relation_name", ""))
 
             ],
 
@@ -3033,53 +3033,13 @@ def create_pdf(
 
                 ),
 
-                pdf_text(
+                detail_cell(survey.get("north", "")),
 
-                    survey.get(
+                detail_cell(survey.get("south", "")),
 
-                        "north",
+                detail_cell(survey.get("east", "")),
 
-                        ""
-
-                    )
-
-                ),
-
-                pdf_text(
-
-                    survey.get(
-
-                        "south",
-
-                        ""
-
-                    )
-
-                ),
-
-                pdf_text(
-
-                    survey.get(
-
-                        "east",
-
-                        ""
-
-                    )
-
-                ),
-
-                pdf_text(
-
-                    survey.get(
-
-                        "west",
-
-                        ""
-
-                    )
-
-                )
+                detail_cell(survey.get("west", ""))
 
             ]
 
@@ -3093,19 +3053,12 @@ def create_pdf(
         repeatRows=1,
 
         colWidths=[
-
             62,
-
-            50,
-
-            88,
-
-            88,
-
-            88,
-
-            88
-
+            52,
+            109,
+            109,
+            109,
+            110
         ]
 
     )
@@ -3294,13 +3247,18 @@ def create_pdf(
         payable_table
     )
 
-    # Notes are placed directly below Total Payable. No extra payment/status
-    # boxes are printed after this section.
+    # Notes are placed directly below Total Payable. Keep this box compact.
+    notes_style = styles["Normal"].clone("NotesCell")
+    notes_style.fontSize = 6.8
+    notes_style.leading = 8
+    notes_style.wordWrap = "LTR"
+    notes_style.splitLongWords = 0
+
     notes_text = pdf_text(data.get("notes", "")) or ""
     notes_table = Table(
         [[
             "Notes",
-            Paragraph(notes_text if notes_text else "", address_style)
+            Paragraph(notes_text if notes_text else "", notes_style)
         ]],
         colWidths=[60, 491]
     )
@@ -3310,10 +3268,10 @@ def create_pdf(
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("BACKGROUND", (0, 0), (0, 0), colors.lightgrey),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ]
         )
     )
