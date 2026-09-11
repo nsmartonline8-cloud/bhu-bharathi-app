@@ -2041,14 +2041,10 @@ def create_pdf(
         output,
 
         pagesize=A4,
-
         leftMargin=22,
-
         rightMargin=22,
-
-        topMargin=20,
-
-        bottomMargin=20
+        topMargin=18,
+        bottomMargin=18
 
     )
 
@@ -2775,15 +2771,10 @@ def create_pdf(
         person_rows,
 
         colWidths=[
-
-            72,
-
-            203,
-
-            72,
-
-            203
-
+            68,
+            207,
+            68,
+            207
         ]
 
     )
@@ -3278,7 +3269,7 @@ def create_pdf(
             "Notes",
             Paragraph(notes_text if notes_text else "", address_style)
         ]],
-        colWidths=[72, 454]
+        colWidths=[68, 483]
     )
     notes_table.setStyle(
         TableStyle(
