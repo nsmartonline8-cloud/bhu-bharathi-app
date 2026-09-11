@@ -1203,16 +1203,9 @@ if (
 ):
     st.session_state.current_sheet = requested_sheet
 
-# No sheet requested and no current session sheet: restore the latest existing
-# sheet for this user. Only create NS-0001 when this user has no sheets at all.
+# No sheet requested and no current session sheet: open/create the first current sheet.
 elif "current_sheet" not in st.session_state:
-    if st.session_state.database:
-        st.session_state.current_sheet = max(
-            st.session_state.database.keys(),
-            key=sheet_value
-        )
-    else:
-        st.session_state.current_sheet = "NS-0001"
+    st.session_state.current_sheet = next_sheet()
 
 # Ensure the selected sheet exists.
 if st.session_state.current_sheet not in st.session_state.database:
@@ -3588,7 +3581,7 @@ with st.sidebar:
     # The current sheet and its current data remain untouched.
     st.markdown(
         """
-        <a href="./?new_sheet=1" target="_blank" rel="noopener noreferrer"
+        <a href="./?new_sheet=1&auth={st.query_params.get("auth", "")}" target="_blank" rel="noopener noreferrer"
            style="display:block; text-align:center; padding:0.55rem 0.8rem;
                   border-radius:0.5rem; text-decoration:none; font-weight:700;
                   background:#1f77b4; color:white; margin-bottom:0.5rem;">
@@ -3798,7 +3791,7 @@ if navigation == "📊 Dashboard":
                         primary_name = saved_sheet_data.get("first_name", "") or "—"
                         st.markdown(
                             f"""
-                            <a href="?sheet={saved_sheet_name}&dashboard_open=1" target="_blank"
+                            <a href="?sheet={saved_sheet_name}&dashboard_open=1&auth={st.query_params.get("auth", "")}" target="_blank"
                                style="text-decoration:none; display:block;">
                               <div style="min-height:145px; padding:16px; border:1px solid #26364d;
                                           border-radius:14px; background:#111c2f; margin-bottom:8px; cursor:pointer;">
@@ -4078,7 +4071,7 @@ if search_text.strip():
 
                 # Opens the selected saved sheet in a new browser tab.
                 st.markdown(
-                    f"""<a href="?sheet={result}&dashboard_open=1" target="_blank"
+                    f"""<a href="?sheet={result}&dashboard_open=1&auth={st.query_params.get("auth", "")}" target="_blank"
                     style="display:block; text-align:center; padding:0.55rem 0.7rem;
                     border-radius:8px; background:#1d4ed8; color:white;
                     text-decoration:none; font-weight:700;">📂 OPEN ↗</a>""",
@@ -7248,7 +7241,7 @@ if st.session_state.get(
         # The current saved sheet and its session data are left untouched.
         st.markdown(
             """
-            <a href="./?new_sheet=1"
+            <a href="./?new_sheet=1&auth={st.query_params.get("auth", "")}"
                target="_blank"
                rel="noopener noreferrer"
                style="
