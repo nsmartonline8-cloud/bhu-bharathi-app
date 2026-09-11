@@ -3581,7 +3581,7 @@ with st.sidebar:
     # The current sheet and its current data remain untouched.
     st.markdown(
         """
-        <a href="./?new_sheet=1&auth={st.query_params.get("auth", "")}" target="_blank" rel="noopener noreferrer"
+        <a href="./?new_sheet=1" target="_blank" rel="noopener noreferrer"
            style="display:block; text-align:center; padding:0.55rem 0.8rem;
                   border-radius:0.5rem; text-decoration:none; font-weight:700;
                   background:#1f77b4; color:white; margin-bottom:0.5rem;">
