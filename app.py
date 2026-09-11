@@ -17,7 +17,7 @@ from email.message import EmailMessage
 from io import BytesIO
 from pathlib import Path
 
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.enums import TA_CENTER
@@ -2040,9 +2040,7 @@ def create_pdf(
 
         output,
 
-        pagesize=landscape(
-            A4
-        ),
+        pagesize=A4,
 
         leftMargin=22,
 
@@ -2078,6 +2076,10 @@ def create_pdf(
     heading_style.alignment = (
         TA_CENTER
     )
+
+    address_style = styles["Normal"].clone("AddressCell")
+    address_style.fontSize = 7.5
+    address_style.leading = 9
 
 
     story = []
@@ -2455,11 +2457,11 @@ def create_pdf(
 
                 "Address",
 
-                pdf_text(first_address),
+                Paragraph(pdf_text(first_address), address_style),
 
                 "Bank Address",
 
-                pdf_text(second_address)
+                Paragraph(pdf_text(second_address), address_style)
 
             ],
 
@@ -2774,13 +2776,13 @@ def create_pdf(
 
         colWidths=[
 
-            100,
+            72,
 
-            275,
+            203,
 
-            100,
+            72,
 
-            275
+            203
 
         ]
 
@@ -3068,17 +3070,17 @@ def create_pdf(
 
         colWidths=[
 
-            100,
+            62,
 
-            80,
+            50,
 
-            140,
+            88,
 
-            140,
+            88,
 
-            140,
+            88,
 
-            140
+            88
 
         ]
 
@@ -3226,205 +3228,73 @@ def create_pdf(
 
     total_payable = challan + charges
 
-    payment_rows = [
+    payable_table = Table(
 
-        [
-
+        [[
             "Challan Rs.",
-
-            challan,
-
+            f"{challan:,.2f}",
             "Charges",
-
-            charges,
-
+            f"{charges:,.2f}",
             "Total Payable",
-
-            total_payable
-
-        ],
-
-        [
-
-            "Total Paid",
-
-            total_paid,
-
-            "Balance",
-
-            total_payable - total_paid,
-
-            "",
-
-            "",
-
-            "",
-
-            ""
-
-        ],
-
-        # Individual payment entries, including their selected payment mode.
-    ]
-
-    for _payment in data.get("payments", []):
-        payment_rows.append([
-            f"Amount Paid {_payment.get('id', '')}",
-            float(_payment.get("amount", 0) or 0),
-            "Payment Mode",
-            pdf_text(_payment.get("payment_mode", "CASH")),
-            "",
-            ""
-        ])
-
-    payment_rows.append([
-
-            "Slot Date",
-
-            pdf_text(
-
-                data.get(
-
-                    "slot_date",
-
-                    ""
-
-                )
-
-            ),
-
-            "Booking Status",
-
-            pdf_text(
-
-                data.get(
-
-                    "booking_status",
-
-                    ""
-
-                )
-
-            ),
-
-            "Notes",
-
-            pdf_text(
-
-                data.get(
-
-                    "notes",
-
-                    ""
-
-                )
-
-            )
-
-        ]
-
-    )
-
-
-    payment_table = Table(
-
-        payment_rows,
+            f"{total_payable:,.2f}"
+        ]],
 
         colWidths=[
-
+            72,
+            82,
+            65,
+            82,
             90,
-
-            120,
-
-            90,
-
-            120,
-
-            90,
-
-            240
-
+            135
         ]
-
     )
 
-
-    payment_table.setStyle(
-
+    payable_table.setStyle(
         TableStyle(
-
             [
-
-                (
-
-                    "GRID",
-
-                    (0, 0),
-
-                    (-1, -1),
-
-                    0.5,
-
-                    colors.grey
-
-                ),
-
-                (
-
-                    "BACKGROUND",
-
-                    (0, 0),
-
-                    (0, -1),
-
-                    colors.lightgrey
-
-                ),
-
-                (
-
-                    "BACKGROUND",
-
-                    (2, 0),
-
-                    (2, -1),
-
-                    colors.lightgrey
-
-                ),
-
-                (
-
-                    "BACKGROUND",
-
-                    (4, 0),
-
-                    (4, -1),
-
-                    colors.lightgrey
-
-                )
-
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BACKGROUND", (0, 0), (0, 0), colors.lightgrey),
+                ("BACKGROUND", (2, 0), (2, 0), colors.lightgrey),
+                ("BACKGROUND", (4, 0), (4, 0), colors.lightgrey),
+                ("FONTNAME", (4, 0), (5, 0), "Helvetica-Bold"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
-
         )
-
     )
-
 
     story.append(
-
-        Spacer(
-            1,
-            10
-        )
-
+        Spacer(1, 10)
     )
-
 
     story.append(
-        payment_table
+        payable_table
     )
+
+    # Notes are placed directly below Total Payable. No extra payment/status
+    # boxes are printed after this section.
+    notes_text = pdf_text(data.get("notes", "")) or ""
+    notes_table = Table(
+        [[
+            "Notes",
+            Paragraph(notes_text if notes_text else "", address_style)
+        ]],
+        colWidths=[72, 454]
+    )
+    notes_table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BACKGROUND", (0, 0), (0, 0), colors.lightgrey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+    story.append(Spacer(1, 6))
+    story.append(notes_table)
 
 
     document.build(
