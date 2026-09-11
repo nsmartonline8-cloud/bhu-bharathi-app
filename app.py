@@ -2084,11 +2084,17 @@ def create_pdf(
         if not text:
             return Paragraph("", address_style)
 
-        # Preserve words completely. Existing new lines and address
-        # separators become line breaks; ReportLab then wraps at spaces.
-        text = re.sub(r"\s*[,;]\s*", "<br/>", text)
-        text = text.replace("\n", "<br/>").replace("\r", "")
-        return Paragraph(text, address_style)
+        # Each comma/semicolon/newline-separated address component gets
+        # its own line. Paragraph performs any additional wrapping only
+        # at spaces, so a word is never split across two lines.
+        parts = [
+            part.strip()
+            for part in re.split(r"[,;\n]+", str(value or ""))
+            if part.strip()
+        ]
+        safe_parts = [pdf_text(part) for part in parts]
+        wrapped = "<br/>".join(safe_parts)
+        return Paragraph(wrapped, address_style)
 
 
     story = []
@@ -2784,10 +2790,10 @@ def create_pdf(
         person_rows,
 
         colWidths=[
-            58,
-            218,
-            58,
-            218
+            55,
+            220,
+            55,
+            220
         ]
 
     )
@@ -3282,7 +3288,7 @@ def create_pdf(
             "Notes",
             Paragraph(notes_text if notes_text else "", address_style)
         ]],
-        colWidths=[68, 483]
+        colWidths=[65, 486]
     )
     notes_table.setStyle(
         TableStyle(
@@ -6871,22 +6877,20 @@ def _send_pdf_email(sheet_name, pdf_data, recipient_override=None):
 # use the existing PDF; otherwise build a temporary PDF from the current data
 # so Download/Print are still available without removing any existing features.
 _current_sheet_for_actions = st.session_state.get("current_sheet", sheet)
-_current_pdf_for_actions = st.session_state.get("saved_pdf", b"")
 
-if (
-    not _current_pdf_for_actions
-    or st.session_state.get("saved_sheet") != _current_sheet_for_actions
-):
-    _pdf_file_for_actions = os.path.join(
-        PDF_FOLDER,
-        f"{_current_sheet_for_actions}.pdf"
-    )
-    if os.path.exists(_pdf_file_for_actions):
-        try:
-            with open(_pdf_file_for_actions, "rb") as _pdf_action_file:
-                _current_pdf_for_actions = _pdf_action_file.read()
-        except Exception:
-            _current_pdf_for_actions = b""
+# Always rebuild the action PDF from the current cloud-loaded sheet data.
+# This prevents an old landscape PDF from being reused after the print
+# layout has been changed.
+_current_data_for_actions = st.session_state.database.get(
+    _current_sheet_for_actions,
+    {}
+)
+_current_pdf_for_actions = create_pdf(
+    _current_sheet_for_actions,
+    _current_data_for_actions
+)
+st.session_state["saved_pdf"] = _current_pdf_for_actions
+st.session_state["saved_sheet"] = _current_sheet_for_actions
 
 _action_save_col, _action_download_col, _action_print_col = st.columns(3)
 
