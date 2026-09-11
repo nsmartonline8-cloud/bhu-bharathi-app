@@ -2040,7 +2040,7 @@ def create_pdf(
 
         output,
 
-        pagesize=A4,
+        pagesize=(A4[1], A4[0]),
         leftMargin=22,
         rightMargin=22,
         topMargin=18,
@@ -2074,8 +2074,19 @@ def create_pdf(
     )
 
     address_style = styles["Normal"].clone("AddressCell")
-    address_style.fontSize = 7.5
+    address_style.fontSize = 7.2
     address_style.leading = 9
+    address_style.wordWrap = "LTR"
+
+    def address_cell(value):
+        text = pdf_text(value or "").strip()
+        if not text:
+            return Paragraph("", address_style)
+        # Keep every word intact. Comma/newline-separated address components
+        # are placed on separate lines; normal long lines wrap automatically.
+        text = re.sub(r"\\s*[,;]\\s*", "<br/>", text)
+        text = text.replace("\\n", "<br/>").replace("\\r", "")
+        return Paragraph(text, address_style)
 
 
     story = []
@@ -2453,11 +2464,11 @@ def create_pdf(
 
                 "Address",
 
-                Paragraph(pdf_text(first_address), address_style),
+                address_cell(first_address),
 
                 "Bank Address",
 
-                Paragraph(pdf_text(second_address), address_style)
+                address_cell(second_address)
 
             ],
 
@@ -2593,7 +2604,7 @@ def create_pdf(
 
                 "Address",
 
-                pdf_text(auth_address)
+                address_cell(auth_address)
 
             ]
 
@@ -2711,7 +2722,7 @@ def create_pdf(
 
                 "Address",
 
-                pdf_text(first_address),
+                address_cell(first_address),
 
                 "Caste",
 
@@ -2759,7 +2770,7 @@ def create_pdf(
 
                 "Address",
 
-                pdf_text(second_address)
+                address_cell(second_address)
 
             ]
 
@@ -2771,10 +2782,10 @@ def create_pdf(
         person_rows,
 
         colWidths=[
-            68,
-            207,
-            68,
-            207
+            62,
+            213,
+            62,
+            213
         ]
 
     )
