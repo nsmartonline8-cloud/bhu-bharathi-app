@@ -2714,7 +2714,7 @@ def create_pdf(
 
                 pdf_text(data.get("first_aadhaar", "")),
 
-                "Relation Name",
+                "Rel.Name",
 
                 pdf_text(data.get("second_relation_name", ""))
 
