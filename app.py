@@ -2716,7 +2716,7 @@ def create_pdf(
 
                 "Relation Name",
 
-                detail_cell(data.get("second_relation_name", ""))
+                pdf_text(data.get("second_relation_name", ""))
 
             ],
 
