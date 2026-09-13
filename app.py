@@ -4738,7 +4738,10 @@ def person_form(
             saved_caste = "SELECT CASTE"
 
 
-        gender_col, caste_col = st.columns(2)
+        if prefix == "second" and person_title.upper() == "BUYER":
+            gender_col, caste_col, _buyer_gc_spacer = st.columns([0.5, 0.5, 1])
+        else:
+            gender_col, caste_col = st.columns(2)
 
 
         with gender_col:
