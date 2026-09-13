@@ -3745,18 +3745,13 @@ saved_type = data.get("document_type", "SALE")
 if saved_type not in document_types:
     saved_type = "SALE"
 
-# Four controls in one compact row. The heading remains above this row.
-type_column, date_column, search_column, txn_column = st.columns(
-    [1, 1, 1.15, 0.45]
+# Three controls in one compact row. The heading remains above this row.
+# DOCUMENT TYPE is removed from the visible layout; the saved document type
+# is still used internally so the existing document-specific structure is unchanged.
+selected_document = saved_type
+date_column, search_column, txn_column = st.columns(
+    [1, 1.15, 0.45]
 )
-
-with type_column:
-    selected_document = st.selectbox(
-        "📜 DOCUMENT TYPE",
-        document_types,
-        index=document_types.index(saved_type),
-        key=f"{sheet}_document_type"
-    )
 
 with date_column:
     st.date_input(
