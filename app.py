@@ -6058,12 +6058,14 @@ with payment_column:
             if saved_payment_mode not in payment_mode_options:
                 saved_payment_mode = "CASH"
 
-            payment_mode = st.selectbox(
-                " ",
-                payment_mode_options,
-                index=payment_mode_options.index(saved_payment_mode),
-                key=f"{sheet}_payment_mode_{payment_id}"
-            )
+            _mode_field_column, _mode_spacer = st.columns([0.85, 0.15])
+            with _mode_field_column:
+                payment_mode = st.selectbox(
+                    " ",
+                    payment_mode_options,
+                    index=payment_mode_options.index(saved_payment_mode),
+                    key=f"{sheet}_payment_mode_{payment_id}"
+                )
 
 
         with delete_column:
