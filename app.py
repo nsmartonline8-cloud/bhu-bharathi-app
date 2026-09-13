@@ -709,6 +709,14 @@ st.markdown(
         font-weight: 800;
     }
 
+    /* DELETE title: smaller text only */
+    .payment-delete-title {
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+        margin: 0 0 2px 0 !important;
+    }
+
     /* PAYMENT DETAILS ONLY: smaller PAYMENT MODE title text */
     .payment-mode-title {
         font-size: 11px !important;
@@ -5529,31 +5537,40 @@ if selected_document != "SUCCESSION":
 
                 with delete_column:
 
-                    st.caption(
-                        "DELETE"
+                    st.markdown(
+
+                        '<div class="payment-delete-title">DELETE</div>',
+
+                        unsafe_allow_html=True
+
                     )
 
 
-                    if st.button(
+                    _delete_left_spacer, _delete_button_column = st.columns([0.18, 0.82])
 
-                        "🗑️",
 
-                        key=(
+                    with _delete_button_column:
 
-                            f"{sheet}_"
 
-                            f"delete_survey_"
+                        if st.button(
 
-                            f"{survey_id}"
+                            "🗑️",
 
-                        ),
+                            key=(
 
-                        use_container_width=True
+                                f"{sheet}_"
 
-                    ):
+                                f"delete_survey_"
 
-                        collect_data()
+                                f"{survey_id}"
 
+                            ),
+
+                            use_container_width=True
+
+                        ):
+
+                            collect_data()
 
                         data["surveys"] = [
 
@@ -5981,7 +5998,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 0.8, 0.7])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 1.15, 0.35])
 
 
         with amount_column:
