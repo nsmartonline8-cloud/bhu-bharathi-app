@@ -3859,17 +3859,6 @@ st.markdown(
 
 
 # TXN NO. is common to every document type and appears directly below the document heading.
-st.text_input(
-
-    "TXN NO.",
-
-    value=data.get("transaction_number", ""),
-
-    key=f"{sheet}_transaction_number"
-
-)
-
-
 # =========================================================
 # REUSABLE PERSON FORM
 # =========================================================
