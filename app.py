@@ -5930,8 +5930,6 @@ with payment_column:
 
 
     payment_values = []
-    total_paid_placeholder = None
-
 
     for payment in (
         data["payments"].copy()
@@ -5942,7 +5940,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([2.9, 2.3, 2.3, 1.1, 1.4])
+        amount_column = st.container()
 
 
         with amount_column:
@@ -5989,88 +5987,9 @@ with payment_column:
                 )
 
 
-        with total_paid_column:
-            # Total Paid: increased to 120% of its original field width.
-            if payment_id == data["payments"][0]["id"]:
-                total_paid_placeholder = st.empty()
-
-        with mode_column:
-
-            st.markdown(
-                '<div class="payment-mode-title">PAYMENT MODE</div>',
-                unsafe_allow_html=True
-            )
-
-            payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
-            saved_payment_mode = str(payment.get("payment_mode", "CASH"))
-            if saved_payment_mode not in payment_mode_options:
-                saved_payment_mode = "CASH"
-
-            _mode_field_column, _mode_spacer = st.columns([0.85, 0.15])
-            with _mode_field_column:
-                payment_mode = st.selectbox(
-                    " ",
-                    payment_mode_options,
-                    index=payment_mode_options.index(saved_payment_mode),
-                    key=f"{sheet}_payment_mode_{payment_id}",
-                    label_visibility="collapsed"
-                )
-
-
-        with delete_column:
-
-            st.markdown(
-                '<div class="payment-delete-title">DELETE</div>',
-                unsafe_allow_html=True
-            )
-
-
-            if st.button(
-
-                "🗑️",
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"delete_payment_"
-
-                    f"{payment_id}"
-
-                ),
-
-                use_container_width=True
-
-            ):
-
-                collect_data()
-
-
-                data["payments"] = [
-
-                    item
-
-                    for item in
-
-                    data["payments"]
-
-                    if item["id"]
-
-                    != payment_id
-
-                ]
-
-
-                save_database()
-
-
-                st.rerun()
-
-
         # Keep the live value in the current sheet data so totals and later saves
         # always use what is currently entered in the widgets.
         payment["amount"] = float(amount)
-        payment["payment_mode"] = payment_mode
         payment_values.append(float(amount))
 
 
@@ -6082,17 +6001,6 @@ with payment_column:
     # Keep calculated values in the current sheet data as well.
     data["total_paid"] = float(total_paid)
     data["total_payable"] = float(total_payable)
-
-    if total_paid_placeholder is not None:
-        total_paid_key = f"{sheet}_total_paid_display"
-        st.session_state[total_paid_key] = f"{total_paid:,.2f}"
-        with total_paid_placeholder.container():
-            st.text_input(
-                "Total Paid",
-                key=total_paid_key,
-                disabled=True
-            )
-
 
     # Keep Balance Amount, Date of Slot Booked and Booking Status on one straight line.
     # Reduce each field to a compact width appropriate to its content.
