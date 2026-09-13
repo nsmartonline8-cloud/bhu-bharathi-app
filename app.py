@@ -3746,7 +3746,7 @@ deed_heading, first_title, second_title = document_names(selected_document)
 # TOP DOCUMENT CONTROLS
 # =========================================================
 
-date_column, search_column, txn_column = st.columns([1, 1.15, 0.45])
+date_column, search_column, txn_column = st.columns([0.70, 0.805, 0.585])
 
 with date_column:
     st.date_input(
