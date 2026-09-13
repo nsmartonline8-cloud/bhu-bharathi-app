@@ -3734,53 +3734,37 @@ st.markdown(
 # TOP DOCUMENT CONTROLS
 # =========================================================
 
-document_types = [
-    "SALE",
-    "GIFT",
-    "MORTGAGE",
-    "SUCCESSION"
-]
+document_types = ["SALE", "GIFT", "MORTGAGE", "SUCCESSION"]
 
 saved_type = data.get("document_type", "SALE")
 if saved_type not in document_types:
     saved_type = "SALE"
 
-# Three controls in one compact row. The heading remains above this row.
-# DOCUMENT TYPE is removed from the visible layout; the saved document type
-# is still used internally so the existing document-specific structure is unchanged.
-selected_document = saved_type
-date_column, search_column, txn_column = st.columns(
-    [1, 1.15, 0.45]
-)
+# Document type is now selected directly beside the deed header.
+header_column, header_type_column = st.columns([4, 1.35])
 
-with date_column:
-    st.date_input(
-        "📅 ENTRY DATE",
-        value=safe_date(
-            data.get(
-                "entry_date",
-                str(date.today())
-            )
-        ),
-        key=f"{sheet}_entry_date",
-        format="DD/MM/YYYY"
+with header_column:
+    st.markdown(
+        f"""
+        <div class="deed-title">
+        {document_names(saved_type)[0]}
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-with search_column:
-    search_text = st.text_input(
-        "🔎 SEARCH SAVED FILE",
-        placeholder="Name, cell, Aadhaar, TXN No. or NS-0001",
-        key="main_search"
+with header_type_column:
+    selected_document = st.selectbox(
+        "DOCUMENT TYPE",
+        document_types,
+        index=document_types.index(saved_type),
+        key=f"{sheet}_document_type"
     )
 
-with txn_column:
-    st.text_input(
-        "TXN NO.",
-        value=data.get("transaction_number", ""),
-        key=f"{sheet}_transaction_number"
-    )
+# Keep the existing document heading variable available to the rest of the app.
+deed_heading, first_title, second_title = document_names(selected_document)
 
-# SEARCH RESULTS
+# =========================================================
 # =========================================================
 
 results = search_files(
