@@ -709,6 +709,11 @@ st.markdown(
         font-weight: 800;
     }
 
+    /* PAYMENT DETAILS ONLY: move Delete button slightly left and up */
+    .payment-delete-title + div {
+        transform: translateY(-4px) !important;
+    }
+
     /* DELETE title: smaller text only */
     .payment-delete-title {
         font-size: 5px !important;
@@ -5999,7 +6004,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 1.8, 2.8, 0.8, 1.2])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 1.8, 2.4, 0.9, 1.7])
 
 
         with amount_column:
