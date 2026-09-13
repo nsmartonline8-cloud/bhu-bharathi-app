@@ -5977,42 +5977,46 @@ with payment_column:
 
         with amount_column:
 
-            amount = (
+            _amount_field_column, _amount_spacer = st.columns([0.4, 0.6])
 
-                st.number_input(
+            with _amount_field_column:
 
-                    f"Amount Paid "
-                    f"{payment_id}",
+                amount = (
 
-                    min_value=0.0,
+                    st.number_input(
 
-                    value=float(
+                        f"Amount Paid "
+                        f"{payment_id}",
 
-                        payment.get(
+                        min_value=0.0,
 
-                            "amount",
+                        value=float(
 
-                            0
+                            payment.get(
+
+                                "amount",
+
+                                0
+
+                            )
+
+                        ),
+
+                        step=100.0,
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"payment_"
+
+                            f"{payment_id}"
 
                         )
-
-                    ),
-
-                    step=100.0,
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"payment_"
-
-                        f"{payment_id}"
 
                     )
 
                 )
-
-            )
 
 
         with mode_column:
@@ -6105,13 +6109,16 @@ with payment_column:
 
     with total_column:
 
-        total_paid_key = f"{sheet}_total_paid_display"
-        st.session_state[total_paid_key] = f"{total_paid:,.2f}"
-        st.text_input(
-            "Total Amount Paid",
-            key=total_paid_key,
-            disabled=True
-        )
+        _total_paid_field_column, _total_paid_spacer = st.columns([0.4, 0.6])
+
+        with _total_paid_field_column:
+            total_paid_key = f"{sheet}_total_paid_display"
+            st.session_state[total_paid_key] = f"{total_paid:,.2f}"
+            st.text_input(
+                "Total Amount Paid",
+                key=total_paid_key,
+                disabled=True
+            )
 
     with balance_column:
 
