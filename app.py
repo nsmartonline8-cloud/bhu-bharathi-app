@@ -78,6 +78,13 @@ st.markdown(
     footer {
         visibility: hidden !important;
     }
+
+    /* PAYMENT DETAILS ONLY: remove +/- steppers from every numeric payment field. */
+    div[data-testid="stNumberInput"]:has(input[aria-label="Challan Rs."]) button,
+    div[data-testid="stNumberInput"]:has(input[aria-label="CHARGES"]) button,
+    div[data-testid="stNumberInput"]:has(input[aria-label^="Amount Paid "]) button {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -5842,49 +5849,30 @@ with payment_column:
     )
 
 
-    challan_amount = (
+    # Payment summary fields: each is 30% of its original width.
+    # The final 10% is intentionally left empty for later use.
+    challan_column, charges_column, total_payable_column, payment_spacer = st.columns(
+        [0.3, 0.3, 0.3, 0.1]
+    )
 
-        st.number_input(
-
+    with challan_column:
+        challan_amount = st.number_input(
             "Challan Rs.",
-
             min_value=0.0,
-
-            value=float(
-
-                data.get(
-
-                    "challan_amount",
-
-                    0
-
-                )
-
-            ),
-
+            value=float(data.get("challan_amount", 0)),
             step=100.0,
-
-            key=(
-
-                f"{sheet}_"
-
-                "challan_amount"
-
-            )
-
+            key=f"{sheet}_challan_amount"
         )
 
-    )
-
-
-    # Additional payment details for all document types.
-    charges = st.number_input(
-        "CHARGES",
-        min_value=0.0,
-        value=float(data.get("charges", 0.0)),
-        step=100.0,
-        key=f"{sheet}_charges"
-    )
+    with charges_column:
+        # Additional payment details for all document types.
+        charges = st.number_input(
+            "CHARGES",
+            min_value=0.0,
+            value=float(data.get("charges", 0.0)),
+            step=100.0,
+            key=f"{sheet}_charges"
+        )
 
     # Keep the current widget values in sheet data immediately.
     data["challan_amount"] = float(challan_amount)
@@ -5896,11 +5884,12 @@ with payment_column:
 
     total_payable_key = f"{sheet}_total_payable"
     st.session_state[total_payable_key] = f"{total_payable:,.2f}"
-    st.text_input(
-        "TOTAL PAYABLE",
-        key=total_payable_key,
-        disabled=True
-    )
+    with total_payable_column:
+        st.text_input(
+            "TOTAL PAYABLE",
+            key=total_payable_key,
+            disabled=True
+        )
 
     if st.button(
 
