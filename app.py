@@ -3702,182 +3702,62 @@ if navigation == "📊 Dashboard":
 
 # =========================================================
 # SHEET NUMBER — TOP LEFT WITHOUT RECTANGLE
+
 # =========================================================
-
-st.markdown(
-    f"""
-<div style="text-align: left; margin-top: 2px; margin-bottom: 6px;">
-<div style="font-size: 10px; font-weight: 600;">SHEET NO.</div>
-<div style="font-size: 18px; font-weight: 800;">{sheet}</div>
-</div>
-""",
-    unsafe_allow_html=True
-)
-
-
-type_column, date_column, search_column = (
-
-    st.columns(
-
-        [
-
-            1,
-
-            1,
-
-            1.6
-
-        ]
-
-    )
-
-)
-
+# TOP DOCUMENT CONTROLS
+# =========================================================
 
 document_types = [
-
     "SALE",
-
     "GIFT",
-
     "MORTGAGE",
-
     "SUCCESSION"
-
 ]
 
-
-saved_type = (
-
-    data.get(
-
-        "document_type",
-
-        "SALE"
-
-    )
-
-)
-
-
-if saved_type not in (
-    document_types
-):
-
+saved_type = data.get("document_type", "SALE")
+if saved_type not in document_types:
     saved_type = "SALE"
 
+# Four controls in one compact row. The heading remains above this row.
+type_column, date_column, search_column, txn_column = st.columns(
+    [1, 1, 1.15, 0.45]
+)
 
 with type_column:
-
-    # Actual widget occupies 50% of the existing Document Type column.
-    _type_widget_col, _type_empty_col = st.columns([1, 1])
-
-    with _type_widget_col:
-
-        selected_document = (
-
-            st.selectbox(
-
-                "📜 DOCUMENT TYPE",
-
-                document_types,
-
-                index=(
-
-                    document_types.index(
-
-                        saved_type
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    "document_type"
-
-                )
-
-            )
-
-        )
-
+    selected_document = st.selectbox(
+        "📜 DOCUMENT TYPE",
+        document_types,
+        index=document_types.index(saved_type),
+        key=f"{sheet}_document_type"
+    )
 
 with date_column:
-
-    # Actual widget occupies 50% of the existing Entry Date column.
-    _date_widget_col, _date_empty_col = st.columns([1, 1])
-
-    with _date_widget_col:
-
-        st.date_input(
-
-            "📅 ENTRY DATE",
-
-            value=(
-
-                safe_date(
-
-                    data.get(
-
-                        "entry_date",
-
-                        str(
-
-                            date.today()
-
-                        )
-
-                    )
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                "entry_date"
-
-            ),
-
-            format="DD/MM/YYYY"
-
-        )
-
+    st.date_input(
+        "📅 ENTRY DATE",
+        value=safe_date(
+            data.get(
+                "entry_date",
+                str(date.today())
+            )
+        ),
+        key=f"{sheet}_entry_date",
+        format="DD/MM/YYYY"
+    )
 
 with search_column:
+    search_text = st.text_input(
+        "🔎 SEARCH SAVED FILE",
+        placeholder="Name, cell, Aadhaar, TXN No. or NS-0001",
+        key="main_search"
+    )
 
-    # Actual widget occupies 50% of the existing Search column.
-    _search_widget_col, _search_empty_col = st.columns([1, 1])
+with txn_column:
+    st.text_input(
+        "TXN NO.",
+        value=data.get("transaction_number", ""),
+        key=f"{sheet}_transaction_number"
+    )
 
-    with _search_widget_col:
-
-        search_text = (
-
-            st.text_input(
-
-                "🔎 SEARCH SAVED FILE",
-
-                placeholder=(
-
-                    "Name, cell, Aadhaar, TXN No. "
-
-                    "or NS-0001"
-
-                ),
-
-                key="main_search"
-
-            )
-
-        )
-
-
-# =========================================================
 # SEARCH RESULTS
 # =========================================================
 
