@@ -6003,42 +6003,46 @@ with payment_column:
 
         with amount_column:
 
-            amount = (
+            _amount_field_column, _amount_spacer = st.columns([0.8, 0.2])
 
-                st.number_input(
+            with _amount_field_column:
 
-                        f"Amount Paid "
-                        f"{payment_id}",
+                amount = (
 
-                        min_value=0.0,
+                    st.number_input(
 
-                        value=float(
+                            f"Amount Paid "
+                            f"{payment_id}",
 
-                            payment.get(
+                            min_value=0.0,
 
-                                "amount",
+                            value=float(
 
-                                0
+                                payment.get(
+
+                                    "amount",
+
+                                    0
+
+                                )
+
+                            ),
+
+                            step=100.0,
+
+                            key=(
+
+                                f"{sheet}_"
+
+                                f"payment_"
+
+                                f"{payment_id}"
 
                             )
 
-                        ),
-
-                        step=100.0,
-
-                        key=(
-
-                            f"{sheet}_"
-
-                            f"payment_"
-
-                            f"{payment_id}"
-
-                        )
+                    )
 
                 )
-
-            )
 
 
         with total_paid_column:
