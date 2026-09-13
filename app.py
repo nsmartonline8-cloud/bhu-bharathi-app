@@ -709,12 +709,11 @@ st.markdown(
         font-weight: 800;
     }
 
-    /* PAYMENT DETAILS ONLY: keep the titles fixed and move only the
-       PAYMENT MODE field and DELETE button down into the same line as
-       AMOUNT PAID / TOTAL PAID. */
+    /* PAYMENT DETAILS ONLY: move the PAYMENT MODE and DELETE controls down
+       without moving their titles. */
     .payment-mode-title + div,
     .payment-delete-title + div {
-        transform: translateY(10px) !important;
+        transform: translateY(8px) !important;
     }
 
     /* PAYMENT DETAILS: keep custom titles aligned with normal field labels. */
@@ -5948,9 +5947,7 @@ with payment_column:
 
         with amount_column:
 
-            # Amount Paid field: 30% of its original field width, leaving
-            # clear space beside it for future fields.
-            _amount_field_column, _amount_spacer = st.columns([0.3, 0.7])
+            _amount_field_column, _amount_spacer = st.columns([0.8, 0.2])
 
             with _amount_field_column:
 
