@@ -5044,7 +5044,7 @@ def person_form(
 
         with family_aadhaar_column:
             st.text_input(
-                "Family Aadhaar No.",
+                "Aadhaar No.",
                 value=data.get(f"{prefix}_family_aadhaar", ""),
                 max_chars=12,
                 key=f"{sheet}_{prefix}_family_aadhaar"
