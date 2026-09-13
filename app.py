@@ -4979,7 +4979,7 @@ def person_form(
     # Birth Year = 30% of its original width.
     # Age is placed directly to the right of Birth Year.
     family_relation_column, birth_year_column, age_column, _family_top_spacer = (
-        st.columns([0.5, 0.3, 0.5, 0.7])
+        st.columns([0.7, 0.3, 0.5, 0.5])
     )
 
     with family_relation_column:
