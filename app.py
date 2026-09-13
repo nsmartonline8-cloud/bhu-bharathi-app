@@ -4974,8 +4974,13 @@ def person_form(
 
 
     # FAMILY MEMBER DETAILS LAYOUT
-    # Row 1: Family Relation + Birth Year
-    family_relation_column, birth_year_column = st.columns(2)
+    # Row 1: Family Relation + Birth Year + Age
+    # Family Relation = 50% of its original width.
+    # Birth Year = 30% of its original width.
+    # Age is placed directly to the right of Birth Year.
+    family_relation_column, birth_year_column, age_column, _family_top_spacer = (
+        st.columns([0.5, 0.3, 0.5, 0.7])
+    )
 
     with family_relation_column:
         family_relation = st.selectbox(
@@ -4995,6 +5000,22 @@ def person_form(
             key=f"{sheet}_{prefix}_family_birth_year"
         )
 
+    with age_column:
+        if birth_year > 0:
+            calculated_age = max(0, current_year - int(birth_year))
+            data[f"{prefix}_family_age"] = calculated_age
+            age_display_key = f"{sheet}_{prefix}_family_age_display"
+            st.session_state[age_display_key] = f"{calculated_age} years"
+            st.text_input("Age", key=age_display_key, disabled=True)
+        else:
+            st.number_input(
+                "Age",
+                min_value=0,
+                max_value=120,
+                value=int(data.get(f"{prefix}_family_age", 0)),
+                key=f"{sheet}_{prefix}_family_age"
+            )
+
     if family_relation != "SELECT RELATION":
         if family_relation == "OTHERS":
             st.text_input(
@@ -5003,35 +5024,14 @@ def person_form(
                 key=f"{sheet}_{prefix}_family_other"
             )
 
-        # Row 2: Family Member Name + Age
-        family_name_column, age_column = st.columns(2)
+        # Row 2: Family Member Name
+        st.text_input(
+            "Family Member Name",
+            value=data.get(f"{prefix}_family_name", ""),
+            key=f"{sheet}_{prefix}_family_name"
+        )
 
-        with family_name_column:
-            st.text_input(
-                "Family Member Name",
-                value=data.get(f"{prefix}_family_name", ""),
-                key=f"{sheet}_{prefix}_family_name"
-            )
-
-        with age_column:
-            if birth_year > 0:
-                calculated_age = max(0, current_year - int(birth_year))
-                data[f"{prefix}_family_age"] = calculated_age
-                age_display_key = f"{sheet}_{prefix}_family_age_display"
-                st.session_state[age_display_key] = f"{calculated_age} years"
-                st.text_input("Age", key=age_display_key, disabled=True)
-            else:
-                st.number_input(
-                    "Age",
-                    min_value=0,
-                    max_value=120,
-                    value=int(data.get(f"{prefix}_family_age", 0)),
-                    key=f"{sheet}_{prefix}_family_age"
-                )
-
-        # Row 3: Family Aadhaar + Family Cell No., each 50% width
-        family_aadhaar, family_cell, _family_contact_spacer = st.columns([0.5, 0.5, 1])
-
+        # Row 3: Family Aadhaar + Family Cell No., each restored to original width
         family_aadhaar, family_cell = st.columns(2)
 
         with family_aadhaar:
