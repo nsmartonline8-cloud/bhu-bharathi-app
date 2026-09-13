@@ -5942,9 +5942,9 @@ with payment_column:
         )
 
 
-        # PAYMENT DETAILS: keep only the Amount Paid field in each payment row.
-        with st.container():
-
+        # PAYMENT DETAILS: keep Amount Paid at 30% of its original field width.
+        _amount_field_column, _amount_right_spacer = st.columns([0.3, 0.7])
+        with _amount_field_column:
             amount = st.number_input(
                 f"Amount Paid {payment_id}",
                 min_value=0.0,
