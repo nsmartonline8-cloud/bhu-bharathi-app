@@ -5931,6 +5931,7 @@ with payment_column:
 
 
     payment_values = []
+    total_paid_placeholder = None
 
 
     for payment in (
@@ -5942,20 +5943,140 @@ with payment_column:
         )
 
 
-        # PAYMENT DETAILS: keep Amount Paid at 30% of its original field width.
-        _amount_field_column, _amount_right_spacer = st.columns([0.3, 0.7])
-        with _amount_field_column:
-            amount = st.number_input(
-                f"Amount Paid {payment_id}",
-                min_value=0.0,
-                value=float(payment.get("amount", 0)),
-                step=100.0,
-                key=f"{sheet}_payment_{payment_id}"
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([2.9, 2.3, 2.3, 1.1, 1.4])
+
+
+        with amount_column:
+
+            _amount_field_column, _amount_spacer = st.columns([0.8, 0.2])
+
+            with _amount_field_column:
+
+                amount = (
+
+                    st.number_input(
+
+                            f"Amount Paid "
+                            f"{payment_id}",
+
+                            min_value=0.0,
+
+                            value=float(
+
+                                payment.get(
+
+                                    "amount",
+
+                                    0
+
+                                )
+
+                            ),
+
+                            step=100.0,
+
+                            key=(
+
+                                f"{sheet}_"
+
+                                f"payment_"
+
+                                f"{payment_id}"
+
+                            )
+
+                    )
+
+                )
+
+
+        with total_paid_column:
+            # Total Paid: increased to 120% of its original field width.
+            if payment_id == data["payments"][0]["id"]:
+                total_paid_placeholder = st.empty()
+
+        with mode_column:
+
+            st.markdown(
+                '<div class="payment-mode-title">PAYMENT MODE</div>',
+                unsafe_allow_html=True
             )
 
-        # Keep the amount for total/balance calculations and saving.
+            payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
+            saved_payment_mode = str(payment.get("payment_mode", "CASH"))
+            if saved_payment_mode not in payment_mode_options:
+                saved_payment_mode = "CASH"
+
+            _mode_field_column, _mode_spacer = st.columns([0.68, 0.32])
+            with _mode_field_column:
+                payment_mode = st.selectbox(
+                    " ",
+                    payment_mode_options,
+                    index=payment_mode_options.index(saved_payment_mode),
+                    key=f"{sheet}_payment_mode_{payment_id}",
+                    label_visibility="collapsed"
+                )
+
+
+        with delete_column:
+
+            st.markdown(
+                '<div class="payment-delete-title">DELETE</div>',
+                unsafe_allow_html=True
+            )
+
+
+            _delete_button_column, _delete_button_spacer = st.columns([0.8, 0.2])
+
+            with _delete_button_column:
+                if st.button(
+
+                    "🗑️",
+
+                    key=(
+
+                        f"{sheet}_"
+
+                        f"delete_payment_"
+
+                        f"{payment_id}"
+
+                    ),
+
+                    use_container_width=True
+
+                ):
+
+                    collect_data()
+
+
+                    data["payments"] = [
+
+                        item
+
+                        for item in
+
+                        data["payments"]
+
+                        if item["id"]
+
+                        != payment_id
+
+                    ]
+
+
+                    save_database()
+
+
+                    st.rerun()
+
+
+        # Keep the live value in the current sheet data so totals and later saves
+        # always use what is currently entered in the widgets.
         payment["amount"] = float(amount)
+        payment["payment_mode"] = payment_mode
         payment_values.append(float(amount))
+
 
     # Calculate the totals LIVE from every visible payment row.
     total_paid = sum(
@@ -5965,6 +6086,17 @@ with payment_column:
     # Keep calculated values in the current sheet data as well.
     data["total_paid"] = float(total_paid)
     data["total_payable"] = float(total_payable)
+
+    if total_paid_placeholder is not None:
+        total_paid_key = f"{sheet}_total_paid_display"
+        st.session_state[total_paid_key] = f"{total_paid:,.2f}"
+        with total_paid_placeholder.container():
+            st.text_input(
+                "Total Paid",
+                key=total_paid_key,
+                disabled=True
+            )
+
 
     # Keep Balance Amount, Date of Slot Booked and Booking Status on one straight line.
     # Reduce each field to a compact width appropriate to its content.
