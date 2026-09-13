@@ -5066,33 +5066,35 @@ def person_form(
         )
 
 
-    st.text_input(
+    _cell_column, _cell_spacer = st.columns([0.5, 0.5])
+    with _cell_column:
+        st.text_input(
 
-        "Cell No.",
+            "Cell No.",
 
-        value=(
+            value=(
 
-            data.get(
+                data.get(
 
-                f"{prefix}_cell",
+                    f"{prefix}_cell",
 
-                ""
+                    ""
+
+                )
+
+            ),
+
+            max_chars=10,
+
+            key=(
+
+                f"{sheet}_"
+
+                f"{prefix}_cell"
 
             )
 
-        ),
-
-        max_chars=10,
-
-        key=(
-
-            f"{sheet}_"
-
-            f"{prefix}_cell"
-
         )
-
-    )
 
 
     if selected_document == "SUCCESSION" and prefix == "first":
