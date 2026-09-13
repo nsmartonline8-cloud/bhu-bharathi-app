@@ -46,17 +46,25 @@ st.markdown(
     """
     <style>
 
-    /* Birth Year controls: + on top, - below */
-    [class*="_birth_year"] [data-testid="stNumberInput"] [data-baseweb="input"] > div:last-child {
+    /* Birth Year: stack + above - */
+    [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"]) button {
+        display: block !important;
+    }
+
+    [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"])
+    [data-baseweb="input"] > div:last-child {
         display: flex !important;
         flex-direction: column !important;
+        justify-content: center !important;
         align-items: stretch !important;
     }
 
-    [class*="_birth_year"] [data-testid="stNumberInput"] [data-baseweb="input"] > div:last-child > button {
-        width: 28px !important;
-        height: 22px !important;
-        min-height: 22px !important;
+    [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"])
+    [data-baseweb="input"] > div:last-child > button {
+        flex: 1 1 50% !important;
+        min-height: 0 !important;
+        height: 50% !important;
+        padding: 0 !important;
     }
 
     [data-testid="stHeader"] {
