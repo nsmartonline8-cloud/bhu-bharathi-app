@@ -5451,6 +5451,10 @@ first_column, second_column = (
 )
 
 
+# Resolve the document-specific titles used by the existing person forms.
+# This restores the variables without changing the existing form structure.
+deed_heading, first_title, second_title = document_names(selected_document)
+
 with first_column:
 
     person_form(
