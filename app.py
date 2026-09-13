@@ -4630,243 +4630,62 @@ def person_form(
 
         with relation_name_column:
 
+                    hno_column, relation_name_column, _hno_relation_spacer = st.columns([0.6, 1, 0.4])
+
+        with hno_column:
             st.text_input(
-
-                "Father / Mother / Spouse",
-
-                value=(
-
-                    data.get(
-
-                        f"{prefix}_relation_name",
-
-                        ""
-
+            
+                        "H.No.",
+            
+                        value=(
+            
+                            data.get(
+            
+                                f"{prefix}_house",
+            
+                                ""
+            
+                            )
+            
+                        ),
+            
+                        key=(
+            
+                            f"{sheet}_"
+            
+                            f"{prefix}_house"
+            
+                        )
+            
                     )
 
-                ),
+        with relation_name_column:
+            st.text_input(
+            
+                            "Father / Mother / Spouse",
+            
+                            value=(
+            
+                                data.get(
+            
+                                    f"{prefix}_relation_name",
+            
+                                    ""
+            
+                                )
+            
+                            ),
+            
+                            key=(
+            
+                                f"{sheet}_"
+            
+                                f"{prefix}_relation_name"
+            
+                            )
+            
+                        )
 
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_relation_name"
-
-                )
-
-            )
-
-
-    # =====================================================
-    # BUYER / DONEE GENDER & CASTE DROPDOWN
-    # =====================================================
-    if show_caste_gender:
-
-        gender_options = [
-
-            "SELECT GENDER",
-
-            "MALE",
-
-            "FEMALE",
-
-            "OTHER"
-
-        ]
-
-
-        caste_options = [
-
-            "SELECT CASTE",
-
-            "GENERAL(OC)",
-
-            "SC",
-
-            "ST",
-
-            "BC-A",
-
-            "BC-B",
-
-            "BC-C",
-
-            "BC-D",
-
-            "BC-E",
-
-            "MINORITY",
-
-            "OTHERS"
-
-        ]
-
-
-        saved_gender = (
-
-            data.get(
-
-                f"{prefix}_gender",
-
-                "SELECT GENDER"
-
-            )
-
-        )
-
-
-        saved_caste = (
-
-            data.get(
-
-                f"{prefix}_caste",
-
-                "SELECT CASTE"
-
-            )
-
-        )
-
-
-        if saved_gender not in gender_options:
-
-            saved_gender = "SELECT GENDER"
-
-
-        if saved_caste not in caste_options:
-
-            saved_caste = "SELECT CASTE"
-
-
-        if prefix == "second" and person_title.upper() == "BUYER":
-            gender_col, caste_col, _buyer_gc_spacer = st.columns([0.5, 0.5, 1])
-        else:
-            gender_col, caste_col = st.columns(2)
-
-
-        with gender_col:
-
-            st.selectbox(
-
-                f"{person_title} GENDER",
-
-                gender_options,
-
-                index=(
-
-                    gender_options.index(
-
-                        saved_gender
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_gender"
-
-                )
-
-            )
-
-
-        with caste_col:
-
-            st.selectbox(
-
-                f"{person_title} CASTE",
-
-                caste_options,
-
-                index=(
-
-                    caste_options.index(
-
-                        saved_caste
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_caste"
-
-                )
-
-            )
-
-
-    aadhaar_column, house_column = (
-
-        st.columns(2)
-
-    )
-
-
-    with aadhaar_column:
-
-        st.text_input(
-
-            "Aadhaar No.",
-
-            value=(
-
-                data.get(
-
-                    f"{prefix}_aadhaar",
-
-                    ""
-
-                )
-
-            ),
-
-            max_chars=12,
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_aadhaar"
-
-            )
-
-        )
-
-
-    with house_column:
-
-        st.text_input(
-
-            "H.No.",
-
-            value=(
-
-                data.get(
-
-                    f"{prefix}_house",
-
-                    ""
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_house"
-
-            )
-
-        )
 
 
     location_column, state_column = (
