@@ -4594,102 +4594,88 @@ def person_form(
             saved_relation = "S/o"
 
 
-        relation_column, relation_name_column, _relation_spacer = (
-            st.columns([0.384, 1, 0.616])
-        )
-
+        relation_column, relation_name_column, hno_column = st.columns([0.384, 1, 1])
 
         with relation_column:
-
             st.selectbox(
-
-                "S/D/W/o",
-
-                relation_options,
-
-                index=(
-
-                    relation_options.index(
-
-                        saved_relation
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_relation"
-
-                )
-
-            )
-
-
-        with relation_name_column:
-
-                    hno_column, relation_name_column, _hno_relation_spacer = st.columns([0.6, 1, 0.4])
-
-        with hno_column:
-                    _relation_hno_left, relation_name_column, hno_column = st.columns([0.384, 1, 0.6])
-
-        with relation_name_column:
-            st.text_input(
-                        
-                                        "Father / Mother / Spouse",
-                        
-                                        value=(
-                        
-                                            data.get(
-                        
-                                                f"{prefix}_relation_name",
-                        
-                                                ""
-                        
-                                            )
-                        
-                                        ),
-                        
-                                        key=(
-                        
-                                            f"{sheet}_"
-                        
-                                            f"{prefix}_relation_name"
-                        
-                                        )
-                        
-                                    )
-
-        with hno_column:
-            st.text_input(
-                        
-                                    "H.No.",
-                        
-                                    value=(
-                        
-                                        data.get(
-                        
-                                            f"{prefix}_house",
-                        
-                                            ""
-                        
-                                        )
-                        
-                                    ),
-                        
-                                    key=(
-                        
-                                        f"{sheet}_"
-                        
-                                        f"{prefix}_house"
-                        
-                                    )
-                        
+            
+                            "S/D/W/o",
+            
+                            relation_options,
+            
+                            index=(
+            
+                                relation_options.index(
+            
+                                    saved_relation
+            
                                 )
+            
+                            ),
+            
+                            key=(
+            
+                                f"{sheet}_"
+            
+                                f"{prefix}_relation"
+            
+                            )
+            
+                        )
 
+        with relation_name_column:
+            st.text_input(
+                                    
+                                                    "Father / Mother / Spouse",
+                                    
+                                                    value=(
+                                    
+                                                        data.get(
+                                    
+                                                            f"{prefix}_relation_name",
+                                    
+                                                            ""
+                                    
+                                                        )
+                                    
+                                                    ),
+                                    
+                                                    key=(
+                                    
+                                                        f"{sheet}_"
+                                    
+                                                        f"{prefix}_relation_name"
+                                    
+                                                    )
+                                    
+                                                )
 
+        with hno_column:
+            st.text_input(
+                                    
+                                                "H.No.",
+                                    
+                                                value=(
+                                    
+                                                    data.get(
+                                    
+                                                        f"{prefix}_house",
+                                    
+                                                        ""
+                                    
+                                                    )
+                                    
+                                                ),
+                                    
+                                                key=(
+                                    
+                                                    f"{sheet}_"
+                                    
+                                                    f"{prefix}_house"
+                                    
+                                                )
+                                    
+                                            )
 
 
     location_column, state_column = (
