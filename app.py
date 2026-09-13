@@ -5164,278 +5164,79 @@ def person_form(
         )
 
 
-    _family_relation_column, _family_relation_spacer = st.columns([0.5, 0.5])
-    with _family_relation_column:
-        family_relation = (
+    # FAMILY MEMBER DETAILS LAYOUT
+    # Row 1: Family Relation + Birth Year
+    family_relation_column, birth_year_column = st.columns(2)
 
-            st.selectbox(
-
-                "Family Relation",
-
-                family_options,
-
-                index=(
-
-                    family_options.index(
-
-                        family_saved
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_family_relation"
-
-                )
-
-            )
-
+    with family_relation_column:
+        family_relation = st.selectbox(
+            "Family Relation",
+            family_options,
+            index=family_options.index(family_saved),
+            key=f"{sheet}_{prefix}_family_relation"
         )
 
+    with birth_year_column:
+        current_year = date.today().year
+        birth_year = st.number_input(
+            "Birth Year",
+            min_value=0,
+            max_value=current_year,
+            value=int(data.get(f"{prefix}_family_birth_year", 0)),
+            key=f"{sheet}_{prefix}_family_birth_year"
+        )
 
-    if family_relation != (
-        "SELECT RELATION"
-    ):
-
-        if family_relation == (
-            "OTHERS"
-        ):
-
+    if family_relation != "SELECT RELATION":
+        if family_relation == "OTHERS":
             st.text_input(
-
                 "Enter Relation",
-
-                value=(
-
-                    data.get(
-
-                        f"{prefix}_family_other",
-
-                        ""
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_family_other"
-
-                )
-
+                value=data.get(f"{prefix}_family_other", ""),
+                key=f"{sheet}_{prefix}_family_other"
             )
 
+        # Row 2: Family Member Name + Age
+        family_name_column, age_column = st.columns(2)
 
-        _family_name_column, _family_name_spacer = st.columns([0.5, 0.5])
-        with _family_name_column:
+        with family_name_column:
             st.text_input(
-
                 "Family Member Name",
-
-                value=(
-
-                    data.get(
-
-                        f"{prefix}_family_name",
-
-                        ""
-
-                    )
-
-                ),
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_family_name"
-
-                )
-
+                value=data.get(f"{prefix}_family_name", ""),
+                key=f"{sheet}_{prefix}_family_name"
             )
-
-
-        current_year = (
-            date.today().year
-        )
-
-
-        birth_column, age_column = (
-
-            st.columns(2)
-
-        )
-
-
-        with birth_column:
-
-            birth_year = (
-
-                st.number_input(
-
-                    "Birth Year",
-
-                    min_value=0,
-
-                    max_value=(
-                        current_year
-                    ),
-
-                    value=int(
-
-                        data.get(
-
-                            f"{prefix}_family_birth_year",
-
-                            0
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"{prefix}_family_birth_year"
-
-                    )
-
-                )
-
-            )
-
 
         with age_column:
-
             if birth_year > 0:
-
-                calculated_age = max(
-                    0,
-                    current_year - int(birth_year)
-                )
-
-                data[
-                    f"{prefix}_family_age"
-                ] = calculated_age
-
-                age_display_key = (
-                    f"{sheet}_"
-                    f"{prefix}_family_age_display"
-                )
+                calculated_age = max(0, current_year - int(birth_year))
+                data[f"{prefix}_family_age"] = calculated_age
+                age_display_key = f"{sheet}_{prefix}_family_age_display"
                 st.session_state[age_display_key] = f"{calculated_age} years"
-                st.text_input(
-                    "Age",
-                    key=age_display_key,
-                    disabled=True
-                )
-
-
+                st.text_input("Age", key=age_display_key, disabled=True)
             else:
-
                 st.number_input(
-
                     "Age",
-
                     min_value=0,
-
                     max_value=120,
-
-                    value=int(
-
-                        data.get(
-
-                            f"{prefix}_family_age",
-
-                            0
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"{prefix}_family_age"
-
-                    )
-
+                    value=int(data.get(f"{prefix}_family_age", 0)),
+                    key=f"{sheet}_{prefix}_family_age"
                 )
 
-
-        family_aadhaar, family_cell = (
-
-            st.columns(2)
-
-        )
-
+        # Row 3: Family Aadhaar + Family Cell No., each 50% width
+        family_aadhaar, family_cell, _family_contact_spacer = st.columns([0.5, 0.5, 1])
 
         with family_aadhaar:
-
             st.text_input(
-
                 "Family Aadhaar No.",
-
-                value=(
-
-                    data.get(
-
-                        f"{prefix}_family_aadhaar",
-
-                        ""
-
-                    )
-
-                ),
-
+                value=data.get(f"{prefix}_family_aadhaar", ""),
                 max_chars=12,
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_family_aadhaar"
-
-                )
-
+                key=f"{sheet}_{prefix}_family_aadhaar"
             )
 
-
         with family_cell:
-
             st.text_input(
-
                 "Family Cell No.",
-
-                value=(
-
-                    data.get(
-
-                        f"{prefix}_family_cell",
-
-                        ""
-
-                    )
-
-                ),
-
+                value=data.get(f"{prefix}_family_cell", ""),
                 max_chars=10,
-
-                key=(
-
-                    f"{sheet}_"
-
-                    f"{prefix}_family_cell"
-
-                )
-
+                key=f"{sheet}_{prefix}_family_cell"
             )
 
 
