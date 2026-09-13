@@ -5966,7 +5966,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 1.8, 2.4, 0.9, 1.7])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([2.9, 2.3, 2.3, 1.0, 1.5])
 
 
         with amount_column:
@@ -6042,8 +6042,9 @@ with payment_column:
 
         with delete_column:
 
-            st.caption(
-                "DELETE"
+            st.markdown(
+                '<div class="payment-delete-title">DELETE</div>',
+                unsafe_allow_html=True
             )
 
 
