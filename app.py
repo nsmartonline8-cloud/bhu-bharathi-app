@@ -5961,6 +5961,7 @@ with payment_column:
 
 
     payment_values = []
+    total_paid_placeholder = None
 
 
     for payment in (
@@ -5972,7 +5973,7 @@ with payment_column:
         )
 
 
-        amount_column, _payment_total_space, mode_column, delete_column = st.columns([4, 2, 3, 1])
+        amount_column, total_paid_column, mode_column, delete_column = st.columns([4, 2, 3, 1])
 
 
         with amount_column:
@@ -6018,6 +6019,12 @@ with payment_column:
 
                 )
 
+
+        with total_paid_column:
+            _total_paid_field_column, _total_paid_spacer = st.columns([0.4, 0.6])
+            with _total_paid_field_column:
+                if payment_id == data["payments"][0]["id"]:
+                    total_paid_placeholder = st.empty()
 
         with mode_column:
 
@@ -6102,26 +6109,16 @@ with payment_column:
     data["total_paid"] = float(total_paid)
     data["total_payable"] = float(total_payable)
 
-
-    total_column, balance_column = (
-
-        st.columns(2)
-
-    )
-
-
-    with total_column:
-
-        _total_paid_field_column, _total_paid_spacer = st.columns([0.4, 0.6])
-
-        with _total_paid_field_column:
-            total_paid_key = f"{sheet}_total_paid_display"
-            st.session_state[total_paid_key] = f"{total_paid:,.2f}"
+    if total_paid_placeholder is not None:
+        total_paid_key = f"{sheet}_total_paid_display"
+        st.session_state[total_paid_key] = f"{total_paid:,.2f}"
+        with total_paid_placeholder.container():
             st.text_input(
                 "Total Paid",
                 key=total_paid_key,
                 disabled=True
             )
+
 
     balance_column = st.container()
 
