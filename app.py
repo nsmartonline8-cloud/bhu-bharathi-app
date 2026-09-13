@@ -5223,21 +5223,24 @@ def person_form(
         # Row 3: Family Aadhaar + Family Cell No., each 50% width
         family_aadhaar, family_cell, _family_contact_spacer = st.columns([0.5, 0.5, 1])
 
+        family_aadhaar, family_cell = st.columns(2)
+
         with family_aadhaar:
             st.text_input(
-                "Family Aadhaar No.",
-                value=data.get(f"{prefix}_family_aadhaar", ""),
-                max_chars=12,
-                key=f"{sheet}_{prefix}_family_aadhaar"
-            )
+                            "Family Aadhaar No.",
+                            value=data.get(f"{prefix}_family_aadhaar", ""),
+                            max_chars=12,
+                            key=f"{sheet}_{prefix}_family_aadhaar"
+                        )
 
         with family_cell:
             st.text_input(
-                "Family Cell No.",
-                value=data.get(f"{prefix}_family_cell", ""),
-                max_chars=10,
-                key=f"{sheet}_{prefix}_family_cell"
-            )
+                            "Family Cell No.",
+                            value=data.get(f"{prefix}_family_cell", ""),
+                            max_chars=10,
+                            key=f"{sheet}_{prefix}_family_cell"
+                        )
+
 
 
 # =========================================================
