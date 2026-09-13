@@ -3704,34 +3704,7 @@ if navigation == "📊 Dashboard":
 # SHEET NUMBER — TOP LEFT WITHOUT RECTANGLE
 
 # =========================================================
-# DEED HEADING — ABOVE ALL TOP DOCUMENT CONTROLS
-# =========================================================
-
-# Use the current widget/session value when available so the heading
-# reflects the selected document type while remaining above the controls.
-_top_selected_document = st.session_state.get(
-    f"{sheet}_document_type",
-    data.get("document_type", "SALE")
-)
-
-if _top_selected_document not in ["SALE", "GIFT", "MORTGAGE", "SUCCESSION"]:
-    _top_selected_document = "SALE"
-
-_deed_heading, _first_title, _second_title = document_names(
-    _top_selected_document
-)
-
-st.markdown(
-    f"""
-    <div class="deed-title">
-    {_deed_heading}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# =========================================================
-# TOP DOCUMENT CONTROLS
+# DEED HEADING + DOCUMENT TYPE DROPDOWN
 # =========================================================
 
 document_types = ["SALE", "GIFT", "MORTGAGE", "SUCCESSION"]
@@ -3740,18 +3713,7 @@ saved_type = data.get("document_type", "SALE")
 if saved_type not in document_types:
     saved_type = "SALE"
 
-# Document type is now selected directly beside the deed header.
 header_column, header_type_column = st.columns([4, 1.35])
-
-with header_column:
-    st.markdown(
-        f"""
-        <div class="deed-title">
-        {document_names(saved_type)[0]}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
 with header_type_column:
     selected_document = st.selectbox(
@@ -3761,10 +3723,46 @@ with header_type_column:
         key=f"{sheet}_document_type"
     )
 
-# Keep the existing document heading variable available to the rest of the app.
-deed_heading, first_title, second_title = document_names(selected_document)
+with header_column:
+    deed_heading, first_title, second_title = document_names(selected_document)
+    st.markdown(
+        f"""
+        <div class="deed-title">
+        {deed_heading}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # =========================================================
+# TOP DOCUMENT CONTROLS
+# =========================================================
+
+date_column, search_column, txn_column = st.columns([1, 1.15, 0.45])
+
+with date_column:
+    st.date_input(
+        "📅 ENTRY DATE",
+        value=safe_date(data.get("entry_date", str(date.today()))),
+        key=f"{sheet}_entry_date",
+        format="DD/MM/YYYY"
+    )
+
+with search_column:
+    search_text = st.text_input(
+        "🔎 SEARCH SAVED FILE",
+        placeholder="Name, cell, Aadhaar, TXN No. or NS-0001",
+        key="main_search"
+    )
+
+with txn_column:
+    st.text_input(
+        "TXN NO.",
+        value=data.get("transaction_number", ""),
+        key=f"{sheet}_transaction_number"
+    )
+
+# SEARCH RESULTS
 # =========================================================
 
 results = search_files(
