@@ -3769,19 +3769,68 @@ if saved_type not in (
 
 with type_column:
 
-    selected_document = (
+    # Actual widget occupies 50% of the existing Document Type column.
+    _type_widget_col, _type_empty_col = st.columns([1, 1])
 
-        st.selectbox(
+    with _type_widget_col:
 
-            "📜 DOCUMENT TYPE",
+        selected_document = (
 
-            document_types,
+            st.selectbox(
 
-            index=(
+                "📜 DOCUMENT TYPE",
 
-                document_types.index(
+                document_types,
 
-                    saved_type
+                index=(
+
+                    document_types.index(
+
+                        saved_type
+
+                    )
+
+                ),
+
+                key=(
+
+                    f"{sheet}_"
+
+                    "document_type"
+
+                )
+
+            )
+
+        )
+
+
+with date_column:
+
+    # Actual widget occupies 50% of the existing Entry Date column.
+    _date_widget_col, _date_empty_col = st.columns([1, 1])
+
+    with _date_widget_col:
+
+        st.date_input(
+
+            "📅 ENTRY DATE",
+
+            value=(
+
+                safe_date(
+
+                    data.get(
+
+                        "entry_date",
+
+                        str(
+
+                            date.today()
+
+                        )
+
+                    )
 
                 )
 
@@ -3791,75 +3840,41 @@ with type_column:
 
                 f"{sheet}_"
 
-                "document_type"
+                "entry_date"
 
-            )
+            ),
+
+            format="DD/MM/YYYY"
 
         )
-
-    )
-
-
-with date_column:
-
-    st.date_input(
-
-        "📅 ENTRY DATE",
-
-        value=(
-
-            safe_date(
-
-                data.get(
-
-                    "entry_date",
-
-                    str(
-
-                        date.today()
-
-                    )
-
-                )
-
-            )
-
-        ),
-
-        key=(
-
-            f"{sheet}_"
-
-            "entry_date"
-
-        ),
-
-        format="DD/MM/YYYY"
-
-    )
 
 
 with search_column:
 
-    search_text = (
+    # Actual widget occupies 50% of the existing Search column.
+    _search_widget_col, _search_empty_col = st.columns([1, 1])
 
-        st.text_input(
+    with _search_widget_col:
 
-            "🔎 SEARCH SAVED FILE",
+        search_text = (
 
-            placeholder=(
+            st.text_input(
 
-                "Name, cell, Aadhaar, TXN No. "
+                "🔎 SEARCH SAVED FILE",
 
-                "or NS-0001"
+                placeholder=(
 
-            ),
+                    "Name, cell, Aadhaar, TXN No. "
 
-            key="main_search"
+                    "or NS-0001"
+
+                ),
+
+                key="main_search"
+
+            )
 
         )
-
-    )
 
 
 # =========================================================
