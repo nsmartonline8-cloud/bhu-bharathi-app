@@ -4633,58 +4633,62 @@ def person_form(
                     hno_column, relation_name_column, _hno_relation_spacer = st.columns([0.6, 1, 0.4])
 
         with hno_column:
-            st.text_input(
-            
-                        "H.No.",
-            
-                        value=(
-            
-                            data.get(
-            
-                                f"{prefix}_house",
-            
-                                ""
-            
-                            )
-            
-                        ),
-            
-                        key=(
-            
-                            f"{sheet}_"
-            
-                            f"{prefix}_house"
-            
-                        )
-            
-                    )
+                    _relation_hno_left, relation_name_column, hno_column = st.columns([0.384, 1, 0.6])
 
         with relation_name_column:
             st.text_input(
-            
-                            "Father / Mother / Spouse",
-            
-                            value=(
-            
-                                data.get(
-            
-                                    f"{prefix}_relation_name",
-            
-                                    ""
-            
+                        
+                                        "Father / Mother / Spouse",
+                        
+                                        value=(
+                        
+                                            data.get(
+                        
+                                                f"{prefix}_relation_name",
+                        
+                                                ""
+                        
+                                            )
+                        
+                                        ),
+                        
+                                        key=(
+                        
+                                            f"{sheet}_"
+                        
+                                            f"{prefix}_relation_name"
+                        
+                                        )
+                        
+                                    )
+
+        with hno_column:
+            st.text_input(
+                        
+                                    "H.No.",
+                        
+                                    value=(
+                        
+                                        data.get(
+                        
+                                            f"{prefix}_house",
+                        
+                                            ""
+                        
+                                        )
+                        
+                                    ),
+                        
+                                    key=(
+                        
+                                        f"{sheet}_"
+                        
+                                        f"{prefix}_house"
+                        
+                                    )
+                        
                                 )
-            
-                            ),
-            
-                            key=(
-            
-                                f"{sheet}_"
-            
-                                f"{prefix}_relation_name"
-            
-                            )
-            
-                        )
+
 
 
 
