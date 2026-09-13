@@ -5999,7 +5999,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 1.15, 0.35])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 1.8, 2.8, 0.8, 1.2])
 
 
         with amount_column:
