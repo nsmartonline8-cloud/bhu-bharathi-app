@@ -580,6 +580,18 @@ st.markdown(
         color: #ffffff;
     }
 
+    /* DOCUMENT HEADING DROPDOWN — centered, compact, ~50% visual scale */
+    [data-testid="stSelectbox"] [data-baseweb="select"] {
+        font-size: 14px !important;
+        min-height: 32px !important;
+    }
+
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        min-height: 32px !important;
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }
+
     .section-title {
         text-align: left;
         font-size: 18px;
@@ -3715,14 +3727,17 @@ if saved_type not in document_types:
 
 # The document heading itself is the dropdown. There is no separate
 # "DOCUMENT TYPE" field; the selected option controls the document heading.
-selected_document = st.selectbox(
-    "DOCUMENT HEADING",
-    document_types,
-    index=document_types.index(saved_type),
-    format_func=lambda value: document_names(value)[0],
-    key=f"{sheet}_document_type",
-    label_visibility="collapsed"
-)
+# Keep the same widget/key, but center it and reduce its visible width by 50%.
+_header_left, _header_center, _header_right = st.columns([1, 2, 1])
+with _header_center:
+    selected_document = st.selectbox(
+        "DOCUMENT HEADING",
+        document_types,
+        index=document_types.index(saved_type),
+        format_func=lambda value: document_names(value)[0],
+        key=f"{sheet}_document_type",
+        label_visibility="collapsed"
+    )
 
 deed_heading, first_title, second_title = document_names(selected_document)
 
