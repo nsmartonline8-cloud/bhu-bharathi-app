@@ -714,21 +714,29 @@ st.markdown(
         transform: translateY(-4px) !important;
     }
 
-    /* DELETE title: smaller text only */
-    .payment-delete-title {
-        font-size: 5px !important;
-        font-weight: 600 !important;
-        line-height: 1.1 !important;
+    /* PAYMENT DETAILS: keep custom titles aligned with normal field labels. */
+    .payment-delete-title,
+    .payment-mode-title {
+        height: 28px !important;
+        display: flex !important;
+        align-items: flex-end !important;
+        box-sizing: border-box !important;
         margin: 0 0 2px 0 !important;
-            white-space: nowrap !important;
+        white-space: nowrap !important;
     }
 
-    /* PAYMENT DETAILS ONLY: smaller PAYMENT MODE title text */
+    /* DELETE title: increased text size only. */
+    .payment-delete-title {
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+    }
+
+    /* PAYMENT MODE title text */
     .payment-mode-title {
         font-size: 11px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
-        margin: 0 0 2px 0 !important;
     }
 
     </style>
@@ -5966,7 +5974,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([2.9, 2.3, 2.3, 1.0, 1.5])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([2.9, 2.3, 2.3, 1.1, 1.4])
 
 
         with amount_column:
@@ -6036,7 +6044,8 @@ with payment_column:
                     " ",
                     payment_mode_options,
                     index=payment_mode_options.index(saved_payment_mode),
-                    key=f"{sheet}_payment_mode_{payment_id}"
+                    key=f"{sheet}_payment_mode_{payment_id}",
+                    label_visibility="collapsed"
                 )
 
 
