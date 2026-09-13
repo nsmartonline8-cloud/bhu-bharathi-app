@@ -5542,62 +5542,24 @@ if selected_document != "SUCCESSION":
 
 
                 with delete_column:
-
-                    st.markdown(
-
-                        '<div class="payment-delete-title">DELETE</div>',
-
-                        unsafe_allow_html=True
-
-                    )
-
-
-                    _delete_left_spacer, _delete_button_column = st.columns([0.18, 0.82])
-
-
-                    with _delete_button_column:
-
-
-                        if st.button(
-
-                            "🗑️",
-
-                            key=(
-
-                                f"{sheet}_"
-
-                                f"delete_survey_"
-
-                                f"{survey_id}"
-
-                            ),
-
-                            use_container_width=True
-
-                        ):
-
-                            collect_data()
-
+                    st.caption("DELETE")
+                    if st.button(
+                        "🗑️",
+                        key=(
+                            f"{sheet}_"
+                            f"delete_survey_"
+                            f"{survey_id}"
+                        ),
+                        use_container_width=True
+                    ):
+                        collect_data()
                         data["surveys"] = [
-
                             item
-
-                            for item in
-
-                            data["surveys"]
-
-                            if item["id"]
-
-                            != survey_id
-
+                            for item in data["surveys"]
+                            if item["id"] != survey_id
                         ]
-
-
                         save_database()
-
-
                         st.rerun()
-
 
                 north_column, south_column = (
 
