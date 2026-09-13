@@ -3704,6 +3704,33 @@ if navigation == "📊 Dashboard":
 # SHEET NUMBER — TOP LEFT WITHOUT RECTANGLE
 
 # =========================================================
+# DEED HEADING — ABOVE ALL TOP DOCUMENT CONTROLS
+# =========================================================
+
+# Use the current widget/session value when available so the heading
+# reflects the selected document type while remaining above the controls.
+_top_selected_document = st.session_state.get(
+    f"{sheet}_document_type",
+    data.get("document_type", "SALE")
+)
+
+if _top_selected_document not in ["SALE", "GIFT", "MORTGAGE", "SUCCESSION"]:
+    _top_selected_document = "SALE"
+
+_deed_heading, _first_title, _second_title = document_names(
+    _top_selected_document
+)
+
+st.markdown(
+    f"""
+    <div class="deed-title">
+    {_deed_heading}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================================================
 # TOP DOCUMENT CONTROLS
 # =========================================================
 
@@ -3826,39 +3853,6 @@ if search_text.strip():
                 )
 
 
-# =========================================================
-# DEED HEADING
-# =========================================================
-
-deed_heading, first_title, second_title = (
-
-    document_names(
-
-        selected_document
-
-    )
-
-)
-
-
-st.markdown(
-
-    f"""
-
-    <div class="deed-title">
-
-    {deed_heading}
-
-    </div>
-
-    """,
-
-    unsafe_allow_html=True
-
-)
-
-
-# TXN NO. is common to every document type and appears directly below the document heading.
 # =========================================================
 # REUSABLE PERSON FORM
 # =========================================================
