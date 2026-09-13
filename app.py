@@ -4574,7 +4574,7 @@ def person_form(
 
 
         relation_column, relation_name_column, _relation_spacer = (
-            st.columns([0.32, 1, 0.68])
+            st.columns([0.384, 1, 0.616])
         )
 
 
