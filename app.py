@@ -4808,11 +4808,9 @@ def person_form(
         )
 
 
-    village_column, pin_column = (
-
-        st.columns(2)
-
-    )
+    # Village = 50% of its original width; PIN No. = 40% of its original width.
+    # Keep PIN directly beside Village and reserve the remaining space on the right.
+    village_column, pin_column, _address_right_spacer = st.columns([0.5, 0.4, 1.1])
 
 
     with village_column:
