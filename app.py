@@ -963,9 +963,7 @@ def empty_file():
         ),
 
         "booking_status":
-        "STATUS PENDING",
-
-        "notes": ""
+        "STATUS PENDING"
 
     }
 
@@ -1697,9 +1695,7 @@ def collect_data():
 
         "charges",
 
-        "booking_status",
-
-        "notes"
+        "booking_status"
 
     ]
 
@@ -3319,36 +3315,6 @@ def create_pdf(
         payable_table
     )
 
-    # Notes are placed directly below Total Payable. Keep this box compact.
-    notes_style = styles["Normal"].clone("NotesCell")
-    notes_style.fontSize = 6.8
-    notes_style.leading = 8
-    notes_style.wordWrap = "LTR"
-    notes_style.splitLongWords = 0
-
-    notes_text = pdf_text(data.get("notes", "")) or ""
-    notes_table = Table(
-        [[
-            "Notes",
-            Paragraph(notes_text if notes_text else "", notes_style)
-        ]],
-        colWidths=[60, 491]
-    )
-    notes_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("BACKGROUND", (0, 0), (0, 0), colors.lightgrey),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ]
-        )
-    )
-    story.append(Spacer(1, 6))
-    story.append(notes_table)
 
 
     document.build(
@@ -6255,33 +6221,6 @@ with payment_column:
         )
 
 
-    st.text_area(
-
-        "Notes",
-
-        value=(
-
-            data.get(
-
-                "notes",
-
-                ""
-
-            )
-
-        ),
-
-        height=70,
-
-        key=(
-
-            f"{sheet}_"
-
-            "notes"
-
-        )
-
-    )
 
 
 st.divider()
