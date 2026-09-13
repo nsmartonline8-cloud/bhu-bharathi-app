@@ -5024,31 +5024,38 @@ def person_form(
                 key=f"{sheet}_{prefix}_family_other"
             )
 
-        # Row 2: Family Member Name
-        st.text_input(
-            "Family Member Name",
-            value=data.get(f"{prefix}_family_name", ""),
-            key=f"{sheet}_{prefix}_family_name"
+        # Row 2: Family Member Name + Family Aadhaar No. + Family Cell No.
+        # Family Member Name = 40% of its original width.
+        # Family Aadhaar No. = 50% of its original width (25% of page width).
+        # Family Cell No. = 50% of its original width (25% of page width).
+        # All three fields are kept on the same line, with the Aadhaar and Cell
+        # fields directly to the right of the Family Member Name.
+        family_name_column, family_aadhaar_column, family_cell_column, _family_bottom_spacer = (
+            st.columns([0.4, 0.25, 0.25, 0.1])
         )
 
-        # Row 3: Family Aadhaar + Family Cell No., each restored to original width
-        family_aadhaar, family_cell = st.columns(2)
-
-        with family_aadhaar:
+        with family_name_column:
             st.text_input(
-                            "Family Aadhaar No.",
-                            value=data.get(f"{prefix}_family_aadhaar", ""),
-                            max_chars=12,
-                            key=f"{sheet}_{prefix}_family_aadhaar"
-                        )
+                "Family Member Name",
+                value=data.get(f"{prefix}_family_name", ""),
+                key=f"{sheet}_{prefix}_family_name"
+            )
 
-        with family_cell:
+        with family_aadhaar_column:
             st.text_input(
-                            "Family Cell No.",
-                            value=data.get(f"{prefix}_family_cell", ""),
-                            max_chars=10,
-                            key=f"{sheet}_{prefix}_family_cell"
-                        )
+                "Family Aadhaar No.",
+                value=data.get(f"{prefix}_family_aadhaar", ""),
+                max_chars=12,
+                key=f"{sheet}_{prefix}_family_aadhaar"
+            )
+
+        with family_cell_column:
+            st.text_input(
+                "Family Cell No.",
+                value=data.get(f"{prefix}_family_cell", ""),
+                max_chars=10,
+                key=f"{sheet}_{prefix}_family_cell"
+            )
 
 
 
