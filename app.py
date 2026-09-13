@@ -5164,35 +5164,37 @@ def person_form(
         )
 
 
-    family_relation = (
+    _family_relation_column, _family_relation_spacer = st.columns([0.5, 0.5])
+    with _family_relation_column:
+        family_relation = (
 
-        st.selectbox(
+            st.selectbox(
 
-            "Family Relation",
+                "Family Relation",
 
-            family_options,
+                family_options,
 
-            index=(
+                index=(
 
-                family_options.index(
+                    family_options.index(
 
-                    family_saved
+                        family_saved
+
+                    )
+
+                ),
+
+                key=(
+
+                    f"{sheet}_"
+
+                    f"{prefix}_family_relation"
 
                 )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_family_relation"
 
             )
 
         )
-
-    )
 
 
     if family_relation != (
@@ -5230,31 +5232,33 @@ def person_form(
             )
 
 
-        st.text_input(
+        _family_name_column, _family_name_spacer = st.columns([0.5, 0.5])
+        with _family_name_column:
+            st.text_input(
 
-            "Family Member Name",
+                "Family Member Name",
 
-            value=(
+                value=(
 
-                data.get(
+                    data.get(
 
-                    f"{prefix}_family_name",
+                        f"{prefix}_family_name",
 
-                    ""
+                        ""
+
+                    )
+
+                ),
+
+                key=(
+
+                    f"{sheet}_"
+
+                    f"{prefix}_family_name"
 
                 )
 
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                f"{prefix}_family_name"
-
             )
-
-        )
 
 
         current_year = (
