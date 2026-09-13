@@ -717,6 +717,12 @@ st.markdown(
         transform: translateY(10px) !important;
     }
 
+    /* PAYMENT DETAILS ONLY: move Total Paid left and down so its lower
+       edge sits against the lower edge of the Date of Slot Booked field. */
+    div[data-testid="stTextInput"]:has(input[aria-label="Total Paid"]) {
+        transform: translate(-18px, 58px) !important;
+    }
+
     /* PAYMENT DETAILS: keep custom titles aligned with normal field labels. */
     .payment-delete-title,
     .payment-mode-title {
