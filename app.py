@@ -709,43 +709,20 @@ st.markdown(
         font-weight: 800;
     }
 
-    /* PAYMENT DETAILS ONLY: keep the titles fixed and move only the
-       PAYMENT MODE field and DELETE button down into the same line as
-       AMOUNT PAID / TOTAL PAID. */
-    .payment-mode-title + div,
-    .payment-delete-title + div {
-        transform: translateY(10px) !important;
-    }
-
-    /* PAYMENT DETAILS ONLY: move Total Paid left and down so its lower
-       edge sits against the lower edge of the Date of Slot Booked field. */
-    div[data-testid="stTextInput"]:has(input[aria-label="Total Paid"]) {
-        transform: translate(-18px, 58px) !important;
-    }
-
-    /* PAYMENT DETAILS: keep custom titles aligned with normal field labels. */
-    .payment-delete-title,
-    .payment-mode-title {
-        height: 28px !important;
-        display: flex !important;
-        align-items: flex-end !important;
-        box-sizing: border-box !important;
-        margin: 0 0 2px 0 !important;
-        white-space: nowrap !important;
-    }
-
-    /* DELETE title: increased text size only. */
+    /* DELETE title: smaller text only */
     .payment-delete-title {
-        font-size: 10px !important;
+        font-size: 8px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
+        margin: 0 0 2px 0 !important;
     }
 
-    /* PAYMENT MODE title text */
+    /* PAYMENT DETAILS ONLY: smaller PAYMENT MODE title text */
     .payment-mode-title {
         font-size: 11px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
+        margin: 0 0 2px 0 !important;
     }
 
     </style>
@@ -970,7 +947,9 @@ def empty_file():
         ),
 
         "booking_status":
-        "STATUS PENDING"
+        "STATUS PENDING",
+
+        "notes": ""
 
     }
 
@@ -1702,7 +1681,9 @@ def collect_data():
 
         "charges",
 
-        "booking_status"
+        "booking_status",
+
+        "notes"
 
     ]
 
@@ -3322,6 +3303,36 @@ def create_pdf(
         payable_table
     )
 
+    # Notes are placed directly below Total Payable. Keep this box compact.
+    notes_style = styles["Normal"].clone("NotesCell")
+    notes_style.fontSize = 6.8
+    notes_style.leading = 8
+    notes_style.wordWrap = "LTR"
+    notes_style.splitLongWords = 0
+
+    notes_text = pdf_text(data.get("notes", "")) or ""
+    notes_table = Table(
+        [[
+            "Notes",
+            Paragraph(notes_text if notes_text else "", notes_style)
+        ]],
+        colWidths=[60, 491]
+    )
+    notes_table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BACKGROUND", (0, 0), (0, 0), colors.lightgrey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
+    story.append(Spacer(1, 6))
+    story.append(notes_table)
 
 
     document.build(
@@ -5525,24 +5536,62 @@ if selected_document != "SUCCESSION":
 
 
                 with delete_column:
-                    st.caption("DELETE")
-                    if st.button(
-                        "🗑️",
-                        key=(
-                            f"{sheet}_"
-                            f"delete_survey_"
-                            f"{survey_id}"
-                        ),
-                        use_container_width=True
-                    ):
-                        collect_data()
+
+                    st.markdown(
+
+                        '<div class="payment-delete-title">DELETE</div>',
+
+                        unsafe_allow_html=True
+
+                    )
+
+
+                    _delete_left_spacer, _delete_button_column = st.columns([0.18, 0.82])
+
+
+                    with _delete_button_column:
+
+
+                        if st.button(
+
+                            "🗑️",
+
+                            key=(
+
+                                f"{sheet}_"
+
+                                f"delete_survey_"
+
+                                f"{survey_id}"
+
+                            ),
+
+                            use_container_width=True
+
+                        ):
+
+                            collect_data()
+
                         data["surveys"] = [
+
                             item
-                            for item in data["surveys"]
-                            if item["id"] != survey_id
+
+                            for item in
+
+                            data["surveys"]
+
+                            if item["id"]
+
+                            != survey_id
+
                         ]
+
+
                         save_database()
+
+
                         st.rerun()
+
 
                 north_column, south_column = (
 
@@ -5949,51 +5998,47 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([2.9, 2.3, 2.3, 1.1, 1.4])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 1.15, 0.35])
 
 
         with amount_column:
 
-            _amount_field_column, _amount_spacer = st.columns([0.8, 0.2])
+            amount = (
 
-            with _amount_field_column:
+                st.number_input(
 
-                amount = (
+                        f"Amount Paid "
+                        f"{payment_id}",
 
-                    st.number_input(
+                        min_value=0.0,
 
-                            f"Amount Paid "
-                            f"{payment_id}",
+                        value=float(
 
-                            min_value=0.0,
+                            payment.get(
 
-                            value=float(
+                                "amount",
 
-                                payment.get(
-
-                                    "amount",
-
-                                    0
-
-                                )
-
-                            ),
-
-                            step=100.0,
-
-                            key=(
-
-                                f"{sheet}_"
-
-                                f"payment_"
-
-                                f"{payment_id}"
+                                0
 
                             )
 
-                    )
+                        ),
+
+                        step=100.0,
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"payment_"
+
+                            f"{payment_id}"
+
+                        )
 
                 )
+
+            )
 
 
         with total_paid_column:
@@ -6013,68 +6058,61 @@ with payment_column:
             if saved_payment_mode not in payment_mode_options:
                 saved_payment_mode = "CASH"
 
-            _mode_field_column, _mode_spacer = st.columns([0.85, 0.15])
-            with _mode_field_column:
-                payment_mode = st.selectbox(
-                    " ",
-                    payment_mode_options,
-                    index=payment_mode_options.index(saved_payment_mode),
-                    key=f"{sheet}_payment_mode_{payment_id}",
-                    label_visibility="collapsed"
-                )
+            payment_mode = st.selectbox(
+                " ",
+                payment_mode_options,
+                index=payment_mode_options.index(saved_payment_mode),
+                key=f"{sheet}_payment_mode_{payment_id}"
+            )
 
 
         with delete_column:
 
-            st.markdown(
-                '<div class="payment-delete-title">DELETE</div>',
-                unsafe_allow_html=True
+            st.caption(
+                "DELETE"
             )
 
 
-            _delete_button_column, _delete_button_spacer = st.columns([0.8, 0.2])
+            if st.button(
 
-            with _delete_button_column:
-                if st.button(
+                "🗑️",
 
-                    "🗑️",
+                key=(
 
-                    key=(
+                    f"{sheet}_"
 
-                        f"{sheet}_"
+                    f"delete_payment_"
 
-                        f"delete_payment_"
+                    f"{payment_id}"
 
-                        f"{payment_id}"
+                ),
 
-                    ),
+                use_container_width=True
 
-                    use_container_width=True
+            ):
 
-                ):
-
-                    collect_data()
+                collect_data()
 
 
-                    data["payments"] = [
+                data["payments"] = [
 
-                        item
+                    item
 
-                        for item in
+                    for item in
 
-                        data["payments"]
+                    data["payments"]
 
-                        if item["id"]
+                    if item["id"]
 
-                        != payment_id
+                    != payment_id
 
-                    ]
-
-
-                    save_database()
+                ]
 
 
-                    st.rerun()
+                save_database()
+
+
+                st.rerun()
 
 
         # Keep the live value in the current sheet data so totals and later saves
@@ -6231,6 +6269,33 @@ with payment_column:
         )
 
 
+    st.text_area(
+
+        "Notes",
+
+        value=(
+
+            data.get(
+
+                "notes",
+
+                ""
+
+            )
+
+        ),
+
+        height=70,
+
+        key=(
+
+            f"{sheet}_"
+
+            "notes"
+
+        )
+
+    )
 
 
 st.divider()
@@ -6331,7 +6396,7 @@ _current_pdf_for_actions = create_pdf(
 st.session_state["saved_pdf"] = _current_pdf_for_actions
 st.session_state["saved_sheet"] = _current_sheet_for_actions
 
-_action_save_col, _action_download_col, _action_print_col, _action_delete_col, _action_right_spacer = st.columns([1, 1, 1, 1, 0.2])
+_action_save_col, _action_download_col, _action_print_col = st.columns(3)
 
 with _action_download_col:
     if _current_pdf_for_actions:
@@ -6427,11 +6492,6 @@ with _action_print_col:
             help="Save the file once to generate the PDF."
         )
 
-
-with _action_delete_col:
-    if st.button("🗑️ Delete", key=f"{sheet}_action_delete", use_container_width=True):
-        st.session_state["confirm_delete_sheet"] = sheet
-        st.rerun()
 with _action_save_col:
     if st.button(
         "💾 SAVE FILE",
