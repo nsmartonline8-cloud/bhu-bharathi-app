@@ -6402,7 +6402,7 @@ _current_pdf_for_actions = create_pdf(
 st.session_state["saved_pdf"] = _current_pdf_for_actions
 st.session_state["saved_sheet"] = _current_sheet_for_actions
 
-_action_save_col, _action_download_col, _action_print_col = st.columns(3)
+_action_save_col, _action_download_col, _action_print_col, _action_right_spacer = st.columns([1, 1, 1, 1.2])
 
 with _action_download_col:
     if _current_pdf_for_actions:
