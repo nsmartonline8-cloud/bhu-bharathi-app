@@ -45,6 +45,20 @@ load_css()
 st.markdown(
     """
     <style>
+
+    /* Birth Year controls: + on top, - below */
+    [class*="_birth_year"] [data-testid="stNumberInput"] [data-baseweb="input"] > div:last-child {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    [class*="_birth_year"] [data-testid="stNumberInput"] [data-baseweb="input"] > div:last-child > button {
+        width: 28px !important;
+        height: 22px !important;
+        min-height: 22px !important;
+    }
+
     [data-testid="stHeader"] {
         display: none !important;
     }
