@@ -5978,13 +5978,9 @@ with payment_column:
 
         with amount_column:
 
-            _amount_field_column, _amount_spacer = st.columns([1, 0])
+            amount = (
 
-            with _amount_field_column:
-
-                amount = (
-
-                    st.number_input(
+                st.number_input(
 
                         f"Amount Paid "
                         f"{payment_id}",
@@ -6015,17 +6011,15 @@ with payment_column:
 
                         )
 
-                    )
-
                 )
+
+            )
 
 
         with total_paid_column:
             # Total Paid: increased to 120% of its original field width.
-            _total_paid_field_column, _total_paid_spacer = st.columns([1, 0])
-            with _total_paid_field_column:
-                if payment_id == data["payments"][0]["id"]:
-                    total_paid_placeholder = st.empty()
+            if payment_id == data["payments"][0]["id"]:
+                total_paid_placeholder = st.empty()
 
         with mode_column:
 
