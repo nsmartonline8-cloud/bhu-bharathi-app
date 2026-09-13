@@ -46,25 +46,24 @@ st.markdown(
     """
     <style>
 
-    /* Birth Year: stack + above - */
-    [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"]) button {
-        display: block !important;
-    }
-
+    /* Birth Year stepper: + on top, - below */
     [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"])
-    [data-baseweb="input"] > div:last-child {
+    div:has(> button[aria-label*="Increment"]):has(> button[aria-label*="Decrement"]) {
         display: flex !important;
         flex-direction: column !important;
-        justify-content: center !important;
         align-items: stretch !important;
     }
 
     [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"])
-    [data-baseweb="input"] > div:last-child > button {
-        flex: 1 1 50% !important;
-        min-height: 0 !important;
-        height: 50% !important;
-        padding: 0 !important;
+    div:has(> button[aria-label*="Increment"]):has(> button[aria-label*="Decrement"])
+    > button[aria-label*="Increment"] {
+        order: 1 !important;
+    }
+
+    [data-testid="stNumberInput"]:has(input[aria-label="Birth Year"])
+    div:has(> button[aria-label*="Increment"]):has(> button[aria-label*="Decrement"])
+    > button[aria-label*="Decrement"] {
+        order: 2 !important;
     }
 
     [data-testid="stHeader"] {
