@@ -6128,7 +6128,11 @@ with payment_column:
             )
 
 
-    balance_column = st.container()
+    # Keep Balance Amount, Date of Slot Booked and Booking Status on one straight line.
+    # Reduce each field to a compact width appropriate to its content.
+    balance_column, date_slot_column, status_column, _booking_right_spacer = st.columns(
+        [0.75, 1.0, 0.85, 0.4]
+    )
 
     with balance_column:
 
@@ -6152,12 +6156,6 @@ with payment_column:
             key=balance_key,
             disabled=True
         )
-
-    date_slot_column, status_column = (
-
-        st.columns(2)
-
-    )
 
 
     with date_slot_column:
