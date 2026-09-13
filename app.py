@@ -5972,7 +5972,7 @@ with payment_column:
         )
 
 
-        amount_column, mode_column, delete_column = st.columns([4, 3, 1])
+        amount_column, _payment_total_space, mode_column, delete_column = st.columns([4, 2, 3, 1])
 
 
         with amount_column:
