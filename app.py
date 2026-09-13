@@ -3704,7 +3704,7 @@ if navigation == "📊 Dashboard":
 # SHEET NUMBER — TOP LEFT WITHOUT RECTANGLE
 
 # =========================================================
-# DEED HEADING + DOCUMENT TYPE DROPDOWN
+# DOCUMENT HEADING DROPDOWN
 # =========================================================
 
 document_types = ["SALE", "GIFT", "MORTGAGE", "SUCCESSION"]
@@ -3713,27 +3713,20 @@ saved_type = data.get("document_type", "SALE")
 if saved_type not in document_types:
     saved_type = "SALE"
 
-header_column, header_type_column = st.columns([4, 1.35])
+# The document heading itself is the dropdown. There is no separate
+# "DOCUMENT TYPE" field; the selected option controls the document heading.
+selected_document = st.selectbox(
+    "DOCUMENT HEADING",
+    document_types,
+    index=document_types.index(saved_type),
+    format_func=lambda value: document_names(value)[0],
+    key=f"{sheet}_document_type",
+    label_visibility="collapsed"
+)
 
-with header_type_column:
-    selected_document = st.selectbox(
-        "DOCUMENT TYPE",
-        document_types,
-        index=document_types.index(saved_type),
-        key=f"{sheet}_document_type"
-    )
+deed_heading, first_title, second_title = document_names(selected_document)
 
-with header_column:
-    deed_heading, first_title, second_title = document_names(selected_document)
-    st.markdown(
-        f"""
-        <div class="deed-title">
-        {deed_heading}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+# =========================================================
 # =========================================================
 # TOP DOCUMENT CONTROLS
 # =========================================================
