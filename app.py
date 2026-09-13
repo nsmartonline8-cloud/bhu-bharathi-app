@@ -5326,154 +5326,196 @@ else:
 # LAND DETAILS
 # =========================================================
 
-if selected_document != "SUCCESSION":
-    with land_column:
+with land_column:
 
-        st.markdown(
+    st.markdown(
 
-            """
+        """
 
-            <div class="section-title land-details-title">
+        <div class="section-title land-details-title">
 
-            🌾 LAND DETAILS
+        🌾 LAND DETAILS
 
-            </div>
+        </div>
 
-            """,
+        """,
 
-            unsafe_allow_html=True
+        unsafe_allow_html=True
+
+    )
+
+
+    if st.button(
+
+        "➕ ADD NEW SURVEY NO.",
+
+        use_container_width=True,
+
+        key=(
+
+            f"{sheet}_"
+
+            "add_survey"
+
+        )
+
+    ):
+
+        collect_data()
+
+
+        existing_ids = [
+
+            survey["id"]
+
+            for survey in
+
+            data["surveys"]
+
+        ]
+
+
+        new_id = (
+
+            max(
+                existing_ids
+            )
+            +
+            1
+
+            if existing_ids
+
+            else 1
 
         )
 
 
-        if st.button(
+        data["surveys"].append(
 
-            "➕ ADD NEW SURVEY NO.",
+            {
 
-            use_container_width=True,
+                "id": new_id,
 
-            key=(
+                "survey_number": "",
 
-                f"{sheet}_"
+                "extent": "",
 
-                "add_survey"
+                "north": "",
 
-            )
+                "south": "",
 
+                "east": "",
+
+                "west": ""
+
+            }
+
+        )
+
+
+        save_database()
+
+
+        st.rerun()
+
+
+    live_total_guntas = 0
+
+    invalid_extent = False
+
+
+    for survey in (
+        data["surveys"].copy()
+    ):
+
+        survey_id = (
+            survey["id"]
+        )
+
+
+        with st.container(
+            border=True
         ):
 
-            collect_data()
+            survey_column, extent_column, delete_column = (
 
+                st.columns(
 
-            existing_ids = [
+                    [
 
-                survey["id"]
+                        2,
 
-                for survey in
+                        1.4,
 
-                data["surveys"]
+                        0.6
 
-            ]
+                    ]
 
-
-            new_id = (
-
-                max(
-                    existing_ids
                 )
-                +
-                1
-
-                if existing_ids
-
-                else 1
 
             )
 
 
-            data["surveys"].append(
+            with survey_column:
 
-                {
+                st.text_input(
 
-                    "id": new_id,
+                    "Survey No.",
 
-                    "survey_number": "",
+                    value=(
 
-                    "extent": "",
+                        survey.get(
 
-                    "north": "",
+                            "survey_number",
 
-                    "south": "",
+                            ""
 
-                    "east": "",
+                        )
 
-                    "west": ""
+                    ),
 
-                }
+                    key=(
 
-            )
+                        f"{sheet}_"
 
+                        f"survey_"
 
-            save_database()
+                        f"{survey_id}_"
 
-
-            st.rerun()
-
-
-        live_total_guntas = 0
-
-        invalid_extent = False
-
-
-        for survey in (
-            data["surveys"].copy()
-        ):
-
-            survey_id = (
-                survey["id"]
-            )
-
-
-            with st.container(
-                border=True
-            ):
-
-                survey_column, extent_column, delete_column = (
-
-                    st.columns(
-
-                        [
-
-                            2,
-
-                            1.4,
-
-                            0.6
-
-                        ]
+                        "survey_number"
 
                     )
 
                 )
 
 
-                with survey_column:
+            with extent_column:
+
+                extent_value = (
 
                     st.text_input(
 
-                        "Survey No.",
+                        "Extent",
 
                         value=(
 
                             survey.get(
 
-                                "survey_number",
+                                "extent",
 
                                 ""
 
                             )
 
                         ),
+
+                        placeholder=(
+
+                            "Example: 1.1500"
+
+                        ),
+
+                        max_chars=20,
 
                         key=(
 
@@ -5483,372 +5525,320 @@ if selected_document != "SUCCESSION":
 
                             f"{survey_id}_"
 
-                            "survey_number"
+                            "extent"
 
                         )
-
-                    )
-
-
-                with extent_column:
-
-                    extent_value = (
-
-                        st.text_input(
-
-                            "Extent",
-
-                            value=(
-
-                                survey.get(
-
-                                    "extent",
-
-                                    ""
-
-                                )
-
-                            ),
-
-                            placeholder=(
-
-                                "Example: 1.1500"
-
-                            ),
-
-                            max_chars=20,
-
-                            key=(
-
-                                f"{sheet}_"
-
-                                f"survey_"
-
-                                f"{survey_id}_"
-
-                                "extent"
-
-                            )
-
-                        )
-
-                    )
-
-
-                with delete_column:
-
-                    st.markdown(
-
-                        '<div class="payment-delete-title">DELETE</div>',
-
-                        unsafe_allow_html=True
-
-                    )
-
-
-                    _delete_left_spacer, _delete_button_column = st.columns([0.18, 0.82])
-
-
-                    with _delete_button_column:
-
-
-                        if st.button(
-
-                            "🗑️",
-
-                            key=(
-
-                                f"{sheet}_"
-
-                                f"delete_survey_"
-
-                                f"{survey_id}"
-
-                            ),
-
-                            use_container_width=True
-
-                        ):
-
-                            collect_data()
-
-                        data["surveys"] = [
-
-                            item
-
-                            for item in
-
-                            data["surveys"]
-
-                            if item["id"]
-
-                            != survey_id
-
-                        ]
-
-
-                        save_database()
-
-
-                        st.rerun()
-
-
-                north_column, south_column = (
-
-                    st.columns(2)
-
-                )
-
-
-                with north_column:
-
-                    st.text_input(
-
-                        "North",
-
-                        value=(
-
-                            survey.get(
-
-                                "north",
-
-                                ""
-
-                            )
-
-                        ),
-
-                        key=(
-
-                            f"{sheet}_"
-
-                            f"survey_"
-
-                            f"{survey_id}_"
-
-                            "north"
-
-                        )
-
-                    )
-
-
-                with south_column:
-
-                    st.text_input(
-
-                        "South",
-
-                        value=(
-
-                            survey.get(
-
-                                "south",
-
-                                ""
-
-                            )
-
-                        ),
-
-                        key=(
-
-                            f"{sheet}_"
-
-                            f"survey_"
-
-                            f"{survey_id}_"
-
-                            "south"
-
-                        )
-
-                    )
-
-
-                east_column, west_column = (
-
-                    st.columns(2)
-
-                )
-
-
-                with east_column:
-
-                    st.text_input(
-
-                        "East",
-
-                        value=(
-
-                            survey.get(
-
-                                "east",
-
-                                ""
-
-                            )
-
-                        ),
-
-                        key=(
-
-                            f"{sheet}_"
-
-                            f"survey_"
-
-                            f"{survey_id}_"
-
-                            "east"
-
-                        )
-
-                    )
-
-
-                with west_column:
-
-                    st.text_input(
-
-                        "West",
-
-                        value=(
-
-                            survey.get(
-
-                                "west",
-
-                                ""
-
-                            )
-
-                        ),
-
-                        key=(
-
-                            f"{sheet}_"
-
-                            f"survey_"
-
-                            f"{survey_id}_"
-
-                            "west"
-
-                        )
-
-                    )
-
-
-                cleaned_live_extent = (
-
-                    clean_extent(
-
-                        extent_value
 
                     )
 
                 )
 
 
-                if (
-                    extent_value
+            with delete_column:
 
-                    !=
+                st.caption(
+                    "DELETE"
+                )
 
-                    cleaned_live_extent
+
+                if st.button(
+
+                    "🗑️",
+
+                    key=(
+
+                        f"{sheet}_"
+
+                        f"delete_survey_"
+
+                        f"{survey_id}"
+
+                    ),
+
+                    use_container_width=True
+
                 ):
 
-                    st.warning(
-
-                        "Extent allows numbers, "
-
-                        "one decimal point and "
-
-                        "a maximum of four digits "
-
-                        "after the decimal."
-
-                    )
+                    collect_data()
 
 
-                converted_extent = (
+                    data["surveys"] = [
 
-                    extent_guntas(
+                        item
 
-                        cleaned_live_extent
+                        for item in
+
+                        data["surveys"]
+
+                        if item["id"]
+
+                        != survey_id
+
+                    ]
+
+
+                    save_database()
+
+
+                    st.rerun()
+
+
+            north_column, south_column = (
+
+                st.columns(2)
+
+            )
+
+
+            with north_column:
+
+                st.text_input(
+
+                    "North",
+
+                    value=(
+
+                        survey.get(
+
+                            "north",
+
+                            ""
+
+                        )
+
+                    ),
+
+                    key=(
+
+                        f"{sheet}_"
+
+                        f"survey_"
+
+                        f"{survey_id}_"
+
+                        "north"
 
                     )
 
                 )
 
 
-                if converted_extent is None:
+            with south_column:
 
-                    invalid_extent = True
+                st.text_input(
 
+                    "South",
 
-                    st.error(
+                    value=(
 
-                        "Invalid extent. Use a "
+                        survey.get(
 
-                        "format such as 1.1500. "
+                            "south",
 
-                        "The first two digits "
+                            ""
 
-                        "after the decimal are "
+                        )
 
-                        "guntas and must be "
+                    ),
 
-                        "between 00 and 39."
+                    key=(
+
+                        f"{sheet}_"
+
+                        f"survey_"
+
+                        f"{survey_id}_"
+
+                        "south"
 
                     )
 
+                )
 
-                else:
 
-                    live_total_guntas += (
+            east_column, west_column = (
 
-                        converted_extent
+                st.columns(2)
+
+            )
+
+
+            with east_column:
+
+                st.text_input(
+
+                    "East",
+
+                    value=(
+
+                        survey.get(
+
+                            "east",
+
+                            ""
+
+                        )
+
+                    ),
+
+                    key=(
+
+                        f"{sheet}_"
+
+                        f"survey_"
+
+                        f"{survey_id}_"
+
+                        "east"
 
                     )
 
-
-        total_acres = (
-
-            live_total_guntas
-
-            // 40
-
-        )
+                )
 
 
-        remaining_guntas = (
+            with west_column:
 
-            live_total_guntas
+                st.text_input(
 
-            % 40
+                    "West",
 
-        )
+                    value=(
+
+                        survey.get(
+
+                            "west",
+
+                            ""
+
+                        )
+
+                    ),
+
+                    key=(
+
+                        f"{sheet}_"
+
+                        f"survey_"
+
+                        f"{survey_id}_"
+
+                        "west"
+
+                    )
+
+                )
 
 
-        live_total_extent = (
+            cleaned_live_extent = (
 
-            f"{total_acres}."
+                clean_extent(
 
-            f"{remaining_guntas:02d}"
+                    extent_value
 
-            "00"
+                )
 
-        )
+            )
 
-    total_extent_box = st.container(border=True)
 
-    with total_extent_box:
-        st.markdown("#### TOTAL EXTENT")
+            if (
+                extent_value
 
-        st.markdown(
-            f"## {live_total_extent}"
-        )
+                !=
+
+                cleaned_live_extent
+            ):
+
+                st.warning(
+
+                    "Extent allows numbers, "
+
+                    "one decimal point and "
+
+                    "a maximum of four digits "
+
+                    "after the decimal."
+
+                )
+
+
+            converted_extent = (
+
+                extent_guntas(
+
+                    cleaned_live_extent
+
+                )
+
+            )
+
+
+            if converted_extent is None:
+
+                invalid_extent = True
+
+
+                st.error(
+
+                    "Invalid extent. Use a "
+
+                    "format such as 1.1500. "
+
+                    "The first two digits "
+
+                    "after the decimal are "
+
+                    "guntas and must be "
+
+                    "between 00 and 39."
+
+                )
+
+
+            else:
+
+                live_total_guntas += (
+
+                    converted_extent
+
+                )
+
+
+    total_acres = (
+
+        live_total_guntas
+
+        // 40
+
+    )
+
+
+    remaining_guntas = (
+
+        live_total_guntas
+
+        % 40
+
+    )
+
+
+    live_total_extent = (
+
+        f"{total_acres}."
+
+        f"{remaining_guntas:02d}"
+
+        "00"
+
+    )
+
+total_extent_box = st.container(border=True)
+
+with total_extent_box:
+    st.markdown("### TOTAL EXTENT")
+
+    st.markdown(
+        f"## {live_total_extent}"
+    )
 
 
 # =========================================================
