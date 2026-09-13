@@ -5981,7 +5981,7 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column = st.columns([3.6, 2.4, 3, 1])
+        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 0.8, 0.7])
 
 
         with amount_column:
@@ -6031,25 +6031,22 @@ with payment_column:
 
         with mode_column:
 
-            _mode_left_spacer, _mode_field_column = st.columns([0.3, 0.7])
+            st.markdown(
+                '<div class="payment-mode-title">PAYMENT MODE</div>',
+                unsafe_allow_html=True
+            )
 
-            with _mode_field_column:
-                st.markdown(
-                    '<div class="payment-mode-title">PAYMENT MODE</div>',
-                    unsafe_allow_html=True
-                )
+            payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
+            saved_payment_mode = str(payment.get("payment_mode", "CASH"))
+            if saved_payment_mode not in payment_mode_options:
+                saved_payment_mode = "CASH"
 
-                payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
-                saved_payment_mode = str(payment.get("payment_mode", "CASH"))
-                if saved_payment_mode not in payment_mode_options:
-                    saved_payment_mode = "CASH"
-
-                payment_mode = st.selectbox(
-                    " ",
-                    payment_mode_options,
-                    index=payment_mode_options.index(saved_payment_mode),
-                    key=f"{sheet}_payment_mode_{payment_id}"
-                )
+            payment_mode = st.selectbox(
+                " ",
+                payment_mode_options,
+                index=payment_mode_options.index(saved_payment_mode),
+                key=f"{sheet}_payment_mode_{payment_id}"
+            )
 
 
         with delete_column:
