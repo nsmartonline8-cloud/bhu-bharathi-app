@@ -6021,7 +6021,8 @@ with payment_column:
 
 
         with total_paid_column:
-            _total_paid_field_column, _total_paid_spacer = st.columns([0.4, 0.6])
+            # Total Paid: increase from 40% to 60% of its original field width.
+            _total_paid_field_column, _total_paid_spacer = st.columns([0.6, 0.4])
             with _total_paid_field_column:
                 if payment_id == data["payments"][0]["id"]:
                     total_paid_placeholder = st.empty()
