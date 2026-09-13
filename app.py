@@ -711,7 +711,7 @@ st.markdown(
 
     /* DELETE title: smaller text only */
     .payment-delete-title {
-        font-size: 10px !important;
+        font-size: 8px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
         margin: 0 0 2px 0 !important;
