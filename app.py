@@ -5973,12 +5973,12 @@ with payment_column:
         )
 
 
-        amount_column, total_paid_column, mode_column, delete_column = st.columns([4, 2, 3, 1])
+        amount_column, total_paid_column, mode_column, delete_column = st.columns([3.6, 2.4, 3, 1])
 
 
         with amount_column:
 
-            _amount_field_column, _amount_spacer = st.columns([0.4, 0.6])
+            _amount_field_column, _amount_spacer = st.columns([1, 0])
 
             with _amount_field_column:
 
@@ -6021,8 +6021,8 @@ with payment_column:
 
 
         with total_paid_column:
-            # Total Paid: increase from 40% to 60% of its original field width.
-            _total_paid_field_column, _total_paid_spacer = st.columns([0.6, 0.4])
+            # Total Paid: increased to 120% of its original field width.
+            _total_paid_field_column, _total_paid_spacer = st.columns([1, 0])
             with _total_paid_field_column:
                 if payment_id == data["payments"][0]["id"]:
                     total_paid_placeholder = st.empty()
