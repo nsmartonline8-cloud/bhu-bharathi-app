@@ -4573,10 +4573,8 @@ def person_form(
             saved_relation = "S/o"
 
 
-        relation_column, relation_name_column = (
-
-            st.columns(2)
-
+        relation_column, relation_name_column, _relation_spacer = (
+            st.columns([0.16, 1, 0.84])
         )
 
 
