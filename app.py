@@ -709,11 +709,12 @@ st.markdown(
         font-weight: 800;
     }
 
-    /* PAYMENT DETAILS ONLY: move the PAYMENT MODE and DELETE controls down
-       without moving their titles. */
+    /* PAYMENT DETAILS ONLY: keep the titles fixed and move only the
+       PAYMENT MODE field and DELETE button down into the same line as
+       AMOUNT PAID / TOTAL PAID. */
     .payment-mode-title + div,
     .payment-delete-title + div {
-        transform: translateY(8px) !important;
+        transform: translateY(10px) !important;
     }
 
     /* PAYMENT DETAILS: keep custom titles aligned with normal field labels. */
