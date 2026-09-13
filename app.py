@@ -709,9 +709,11 @@ st.markdown(
         font-weight: 800;
     }
 
-    /* PAYMENT DETAILS ONLY: move Delete button slightly left and up */
+    /* PAYMENT DETAILS ONLY: move the PAYMENT MODE and DELETE controls down
+       without moving their titles. */
+    .payment-mode-title + div,
     .payment-delete-title + div {
-        transform: translateY(-4px) !important;
+        transform: translateY(8px) !important;
     }
 
     /* PAYMENT DETAILS: keep custom titles aligned with normal field labels. */
