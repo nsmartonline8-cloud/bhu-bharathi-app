@@ -4079,7 +4079,7 @@ def person_form(
             )
 
 
-        pin_col, cell_col = st.columns(2)
+        pin_col, cell_col, _cell_spacer = st.columns([1, 0.5, 0.5])
 
 
         with pin_col:
@@ -4428,7 +4428,7 @@ def person_form(
             )
 
 
-        auth_pin_col, auth_cell_col = st.columns(2)
+        auth_pin_col, auth_cell_col, _cell_spacer = st.columns([1, 0.5, 0.5])
 
 
         with auth_pin_col:
