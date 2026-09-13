@@ -6021,17 +6021,20 @@ with payment_column:
 
         with mode_column:
 
-            payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
-            saved_payment_mode = str(payment.get("payment_mode", "CASH"))
-            if saved_payment_mode not in payment_mode_options:
-                saved_payment_mode = "CASH"
+            _mode_field_column, _mode_spacer = st.columns([0.7, 0.3])
 
-            payment_mode = st.selectbox(
-                "PAYMENT MODE",
-                payment_mode_options,
-                index=payment_mode_options.index(saved_payment_mode),
-                key=f"{sheet}_payment_mode_{payment_id}"
-            )
+            with _mode_field_column:
+                payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
+                saved_payment_mode = str(payment.get("payment_mode", "CASH"))
+                if saved_payment_mode not in payment_mode_options:
+                    saved_payment_mode = "CASH"
+
+                payment_mode = st.selectbox(
+                    "PAYMENT MODE",
+                    payment_mode_options,
+                    index=payment_mode_options.index(saved_payment_mode),
+                    key=f"{sheet}_payment_mode_{payment_id}"
+                )
 
 
         with delete_column:
