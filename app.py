@@ -5972,7 +5972,11 @@ with payment_column:
         )
 
 
-        amount_column, mode_column, delete_column = st.columns([4, 3, 1])
+        # Keep Total Paid between Amount Paid 1 and Payment Mode.
+        if payment_id == 1:
+            amount_column, total_paid_row_column, mode_column, delete_column = st.columns([4, 3, 3, 1])
+        else:
+            amount_column, mode_column, delete_column = st.columns([4, 3, 1])
 
 
         with amount_column:
@@ -6100,25 +6104,16 @@ with payment_column:
     data["total_payable"] = float(total_payable)
 
 
-    total_column, balance_column = (
+    # Update Total Paid in its row position after all payment values are read.
+    if "total_paid_row_placeholder" in locals():
+        total_paid_row_placeholder.text_input(
+            "Total Paid",
+            value=f"{total_paid:,.2f}",
+            disabled=True,
+            key=f"{sheet}_total_paid_display_row"
+        )
 
-        st.columns(2)
-
-    )
-
-
-    with total_column:
-
-        _total_paid_field_column, _total_paid_spacer = st.columns([0.4, 0.6])
-
-        with _total_paid_field_column:
-            total_paid_key = f"{sheet}_total_paid_display"
-            st.session_state[total_paid_key] = f"{total_paid:,.2f}"
-            st.text_input(
-                "Total Amount Paid",
-                key=total_paid_key,
-                disabled=True
-            )
+    balance_column = st.container()
 
     with balance_column:
 
