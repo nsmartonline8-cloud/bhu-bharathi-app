@@ -5028,10 +5028,11 @@ def person_form(
         # Family Member Name = 40% of its original width.
         # Family Aadhaar No. = 50% of its original width (25% of page width).
         # Family Cell No. = 50% of its original width (25% of page width).
-        # All three fields are kept on the same line, with the Aadhaar and Cell
-        # fields directly to the right of the Family Member Name.
-        family_name_column, family_aadhaar_column, _family_middle_spacer, family_cell_column = (
-            st.columns([0.4, 0.25, 0.1, 0.25])
+        # All three fields are kept on one straight line: Name -> Aadhaar -> Cell.
+        # No spacer is placed between the three fields; the remaining space is kept
+        # at the far right for clean alignment.
+        family_name_column, family_aadhaar_column, family_cell_column, _family_right_spacer = (
+            st.columns([0.4, 0.25, 0.25, 0.1])
         )
 
         with family_name_column:
