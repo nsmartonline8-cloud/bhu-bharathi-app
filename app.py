@@ -6402,7 +6402,7 @@ _current_pdf_for_actions = create_pdf(
 st.session_state["saved_pdf"] = _current_pdf_for_actions
 st.session_state["saved_sheet"] = _current_sheet_for_actions
 
-_action_save_col, _action_download_col, _action_print_col, _action_right_spacer = st.columns([1, 1, 1, 1.2])
+_action_save_col, _action_download_col, _action_print_col, _action_delete_col, _action_right_spacer = st.columns([1, 1, 1, 1, 0.2])
 
 with _action_download_col:
     if _current_pdf_for_actions:
@@ -6498,6 +6498,11 @@ with _action_print_col:
             help="Save the file once to generate the PDF."
         )
 
+
+with _action_delete_col:
+    if st.button("🗑️ Delete", key=f"{sheet}_action_delete", use_container_width=True):
+        st.session_state["confirm_delete_sheet"] = sheet
+        st.rerun()
 with _action_save_col:
     if st.button(
         "💾 SAVE FILE",
