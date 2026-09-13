@@ -709,6 +709,14 @@ st.markdown(
         font-weight: 800;
     }
 
+    /* PAYMENT DETAILS ONLY: smaller PAYMENT MODE title text */
+    .payment-mode-title {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        line-height: 1.1 !important;
+        margin: 0 0 2px 0 !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -6023,16 +6031,21 @@ with payment_column:
 
         with mode_column:
 
-            _mode_field_column, _mode_spacer = st.columns([0.7, 0.3])
+            _mode_left_spacer, _mode_field_column = st.columns([0.3, 0.7])
 
             with _mode_field_column:
+                st.markdown(
+                    '<div class="payment-mode-title">PAYMENT MODE</div>',
+                    unsafe_allow_html=True
+                )
+
                 payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
                 saved_payment_mode = str(payment.get("payment_mode", "CASH"))
                 if saved_payment_mode not in payment_mode_options:
                     saved_payment_mode = "CASH"
 
                 payment_mode = st.selectbox(
-                    "PAYMENT MODE",
+                    " ",
                     payment_mode_options,
                     index=payment_mode_options.index(saved_payment_mode),
                     key=f"{sheet}_payment_mode_{payment_id}"
