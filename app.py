@@ -726,43 +726,71 @@ st.markdown(
     }
 
     /* =========================================================
-       DOCUMENT ENTRY STEPS — 50% COMPACT FIELD LAYOUT
-       Every input/select/date/textarea is exactly 50% of the
-       original widget width. Columns are packed toward the left
-       so the reduced boxes sit close together instead of staying
-       in their old full-width positions.
+       DOCUMENT ENTRY STEPS — PERFECT 50% COMPACT GRID
+       Keep every field at 50% of the width it had in its
+       original column layout, but repack the columns so there
+       is no large empty space between fields.
        ========================================================= */
     .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: flex-start !important;
-        column-gap: 0.35rem !important;
-        row-gap: 0.20rem !important;
         justify-content: flex-start !important;
+        column-gap: 0.45rem !important;
+        row-gap: 0.18rem !important;
+        width: 100% !important;
     }
 
     .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-        flex: 0 0 auto !important;
-        width: auto !important;
+        flex-grow: 0 !important;
         min-width: 0 !important;
         max-width: none !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 2 original columns -> each field becomes 25% of the page. */
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(2)):not(:has(> [data-testid="stColumn"]:nth-child(3))) > [data-testid="stColumn"] {
+        flex-basis: calc(25% - 0.45rem) !important;
+    }
+
+    /* 3 original columns -> each field becomes 1/6 of the page. */
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3)):not(:has(> [data-testid="stColumn"]:nth-child(4))) > [data-testid="stColumn"] {
+        flex-basis: calc(16.6667% - 0.45rem) !important;
+    }
+
+    /* 4 original columns -> each field becomes 1/8 of the page. */
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)):not(:has(> [data-testid="stColumn"]:nth-child(5))) > [data-testid="stColumn"] {
+        flex-basis: calc(12.5% - 0.45rem) !important;
+    }
+
+    /* 5 original columns -> each field becomes 1/10 of the page. */
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(5)):not(:has(> [data-testid="stColumn"]:nth-child(6))) > [data-testid="stColumn"] {
+        flex-basis: calc(10% - 0.45rem) !important;
+    }
+
+    /* 6+ columns are rare; keep them compact without overflowing. */
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(6)) > [data-testid="stColumn"] {
+        flex-basis: calc(8.3333% - 0.45rem) !important;
     }
 
     .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {
-        width: fit-content !important;
+        width: 100% !important;
         min-width: 0 !important;
     }
 
+    /* The control fills its newly packed column; the column itself is the
+       50%-sized replacement for the original field. */
     .block-container:has(.document-step-layout) [data-testid="stTextInput"],
     .block-container:has(.document-step-layout) [data-testid="stNumberInput"],
     .block-container:has(.document-step-layout) [data-testid="stDateInput"],
     .block-container:has(.document-step-layout) [data-testid="stSelectbox"],
     .block-container:has(.document-step-layout) [data-testid="stTextArea"] {
-        width: 50% !important;
-        max-width: 50% !important;
+        width: 100% !important;
+        max-width: 100% !important;
         min-width: 0 !important;
         margin: 0 !important;
         padding-bottom: 0 !important;
+        box-sizing: border-box !important;
     }
 
     .block-container:has(.document-step-layout) [data-testid="stTextInput"] > div,
@@ -788,7 +816,6 @@ st.markdown(
         box-sizing: border-box !important;
     }
 
-    /* Keep labels directly attached to their smaller controls. */
     .block-container:has(.document-step-layout) [data-testid="stTextInput"] label,
     .block-container:has(.document-step-layout) [data-testid="stNumberInput"] label,
     .block-container:has(.document-step-layout) [data-testid="stDateInput"] label,
