@@ -3786,101 +3786,54 @@ with _header_center:
 deed_heading, first_title, second_title = document_names(selected_document)
 
 # =========================================================
+# MULTI-PAGE DOCUMENT ENTRY
 # =========================================================
-# TOP DOCUMENT CONTROLS
-# =========================================================
+# Each step is rendered as its own page/view. The step selector allows direct
+# movement between pages, while Next/Previous buttons are provided below.
+if "document_step" not in st.session_state:
+    st.session_state.document_step = 1
 
-date_column, search_column, txn_column, _top_spacer = st.columns([0.063, 0.07245, 0.05265, 0.105])
+def _switch_document_step():
+    # Persist everything currently visible before changing the page.
+    collect_data()
+    save_database()
 
-with date_column:
-    st.date_input(
-        "📅 ENTRY DATE",
-        value=safe_date(data.get("entry_date", str(date.today()))),
-        key=f"{sheet}_entry_date",
-        format="DD/MM/YYYY"
-    )
+step_labels = {
+    1: "1 • SELLER",
+    2: "2 • BUYER",
+    3: "3 • LAND",
+    4: "4 • PAYMENT",
+}
 
-with search_column:
-    search_text = st.text_input(
-        "🔎 SEARCH SAVED FILE",
-        placeholder="Name, cell, Aadhaar, TXN No. or NS-0001",
-        key="main_search"
-    )
-
-with txn_column:
-    st.text_input(
-        "TXN NO.",
-        value=data.get("transaction_number", ""),
-        key=f"{sheet}_transaction_number"
-    )
-
-# SEARCH RESULTS
-# =========================================================
-
-results = search_files(
-    search_text
-)
-
-
-if search_text.strip():
-
-    if not results:
-
-        st.warning(
-            "No saved sheet found."
+step_col1, step_col2, step_col3, step_col4 = st.columns(4)
+step_columns = [step_col1, step_col2, step_col3, step_col4]
+for step_number, step_column in enumerate(step_columns, 1):
+    with step_column:
+        st.markdown(
+            f"<div style='text-align:center;font-size:11px;font-weight:800;'>{step_labels[step_number]}</div>",
+            unsafe_allow_html=True
         )
 
-    else:
+current_step = st.radio(
+    "DOCUMENT STEP",
+    [1, 2, 3, 4],
+    index=max(0, min(3, int(st.session_state.get("document_step", 1)) - 1)),
+    format_func=lambda value: step_labels[value],
+    horizontal=True,
+    key=f"{sheet}_document_step_selector",
+    on_change=_switch_document_step,
+    label_visibility="collapsed"
+)
+st.session_state.document_step = current_step
 
-        for result in results:
+st.markdown(
+    f"<div style=\"text-align:center;margin:4px 0 14px;font-size:14px;font-weight:800;color:#2563eb;\">STEP {current_step} OF 4 — {step_labels[current_step].split(' • ', 1)[1]}</div>",
+    unsafe_allow_html=True
+)
 
-            result_box, result_button = (
-
-                st.columns(
-
-                    [
-
-                        5,
-
-                        1
-
-                    ]
-
-                )
-
-            )
-
-
-            with result_box:
-
-                st.markdown(
-
-                    f"""
-
-                    <div class="search-sheet">
-
-                    📄 {result}
-
-                    </div>
-
-                    """,
-
-                    unsafe_allow_html=True
-
-                )
-
-
-            with result_button:
-
-                # Opens the selected saved sheet in a new browser tab.
-                st.markdown(
-                    f"""<a href="?sheet={result}&dashboard_open=1&auth={st.query_params.get("auth", "")}" target="_blank"
-                    style="display:block; text-align:center; padding:0.55rem 0.7rem;
-                    border-radius:8px; background:#1d4ed8; color:white;
-                    text-decoration:none; font-weight:700;">📂 OPEN ↗</a>""",
-                    unsafe_allow_html=True
-                )
-
+# The date, search and transaction controls are intentionally hidden from the
+# four entry pages. Transaction/date values remain part of the saved record and
+# are preserved by collect_data()/the database.
 
 # =========================================================
 # REUSABLE PERSON FORM
@@ -5082,440 +5035,340 @@ def person_form(
 
 
 # =========================================================
-# SUCCESSION — SUCCESSOR COUNT
-# =========================================================
-if selected_document == "SUCCESSION":
-    successor_count_key = f"{sheet}_successor_count"
-    if successor_count_key not in st.session_state:
-        st.session_state[successor_count_key] = max(1, int(data.get("successor_count", 1)))
-
-# =========================================================
-# PERSON SPLIT VIEW
+# STEP-SPECIFIC PAGE CONTENT
 # =========================================================
 
-first_column, second_column = (
+if current_step in (1, 2):
+    # =========================================================
+    # PERSON DETAILS PAGES
+    # =========================================================
+    if current_step in (1, 2):
+        if current_step == 1:
+            # STEP 1 — SELLER/DONOR/MORTGAGOR/PREDECESSOR + FAMILY
+            person_form("first", first_title)
+        else:
+            # STEP 2 — BUYER/DONEE/BANK/SUCCESSOR + FAMILY
+            person_form(
+                "second",
+                second_title,
+                include_transaction=True,
+                ppb_optional=True,
+                show_caste_gender=(selected_document in ["SALE", "GIFT"]),
+                is_bank=(selected_document == "MORTGAGE")
+            )
 
-    st.columns(
+elif current_step == 3:
+    # STEP 3 — LAND DETAILS ONLY
+    # =========================================================
+    # SUCCESSION — SUCCESSOR-WISE LAND DETAILS
+    # =========================================================
+    def render_successor_land(successor_number):
+        """Render land details directly under one successor and return total guntas."""
+        land_key = f"successor_{successor_number}"
+        successor_lands = data.setdefault("successor_lands", {})
+        allocations = successor_lands.setdefault(land_key, [])
 
-        2,
+        with st.container(border=True):
+            st.markdown(f"#### 🌾 LAND DETAILS — SUCCESSOR {successor_number}")
 
-        gap="medium"
+            top_left, top_right = st.columns([3, 1])
+            with top_left:
+                if st.button("➕ ADD SURVEY", key=f"{sheet}_{land_key}_add_land", use_container_width=True):
+                    collect_data()
+                    existing_ids = [item.get("id", 0) for item in allocations]
+                    new_id = max(existing_ids) + 1 if existing_ids else 1
+                    allocations.append({"id": new_id, "survey_number": "", "extent": "", "north": "", "south": "", "east": "", "west": ""})
+                    save_database()
+                    st.rerun()
+            with top_right:
+                st.caption("Add land for this successor")
 
-    )
+            total_guntas = 0
+            for allocation in allocations.copy():
+                allocation_id = allocation.get("id")
+                with st.container(border=True):
+                    survey_col, extent_col, delete_col = st.columns([1.5, 1.1, 0.45])
+                    with survey_col:
+                        st.text_input("Survey No.", value=allocation.get("survey_number", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_survey_number")
+                    with extent_col:
+                        allocation_extent = st.text_input("Extent", value=allocation.get("extent", ""), placeholder="1.1500", key=f"{sheet}_{land_key}_land_{allocation_id}_extent")
+                    with delete_col:
+                        st.caption("Delete")
+                        if st.button("🗑️", key=f"{sheet}_{land_key}_delete_land_{allocation_id}", use_container_width=True):
+                            collect_data()
+                            successor_lands[land_key] = [item for item in allocations if item.get("id") != allocation_id]
+                            save_database()
+                            st.rerun()
 
-)
+                    north_col, south_col, east_col, west_col = st.columns(4)
+                    with north_col:
+                        st.text_input("North", value=allocation.get("north", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_north")
+                    with south_col:
+                        st.text_input("South", value=allocation.get("south", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_south")
+                    with east_col:
+                        st.text_input("East", value=allocation.get("east", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_east")
+                    with west_col:
+                        st.text_input("West", value=allocation.get("west", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_west")
+
+                    cleaned_extent = clean_extent(allocation_extent)
+                    converted_extent = extent_guntas(cleaned_extent)
+                    if allocation_extent and converted_extent is None:
+                        st.error("Invalid extent. Example: 1.1500 (guntas 00–39).")
+                    elif converted_extent is not None:
+                        total_guntas += converted_extent
+
+            total_acres = total_guntas // 40
+            remaining_guntas = total_guntas % 40
+            total_extent = f"{total_acres}.{remaining_guntas:02d}00"
+            total_col, _ = st.columns([1.2, 2.8])
+            total_widget_key = f"{sheet}_{land_key}_total_extent"
+            # This is a calculated field, so refresh its widget value on every rerun.
+            # Otherwise Streamlit keeps the old disabled value (often 0.0000).
+            st.session_state[total_widget_key] = total_extent
+            with total_col:
+                st.text_input("TOTAL EXTENT", value=total_extent, disabled=True, key=total_widget_key)
+
+        return total_guntas
 
 
-# Resolve the document-specific titles used by the existing person forms.
-# This restores the variables without changing the existing form structure.
-deed_heading, first_title, second_title = document_names(selected_document)
+    # =========================================================
+    # SUCCESSION — ADDITIONAL SUCCESSORS + LINKED LAND
+    # =========================================================
+    def delete_successor(successor_number, successor_count):
+        delete_prefix = f"{sheet}_successor_{successor_number}_"
+        for key in list(st.session_state.keys()):
+            if key.startswith(delete_prefix):
+                del st.session_state[key]
 
-with first_column:
+        for current_number in range(successor_number + 1, successor_count + 1):
+            old_prefix = f"{sheet}_successor_{current_number}_"
+            new_prefix = f"{sheet}_successor_{current_number - 1}_"
+            for key in list(st.session_state.keys()):
+                if key.startswith(old_prefix):
+                    st.session_state[new_prefix + key[len(old_prefix):]] = st.session_state.pop(key)
 
-    person_form(
+        for key in list(data.keys()):
+            if key.startswith(f"successor_{successor_number}_"):
+                del data[key]
 
-        "first",
+        for current_number in range(successor_number + 1, successor_count + 1):
+            old_prefix = f"successor_{current_number}_"
+            new_prefix = f"successor_{current_number - 1}_"
+            for key in list(data.keys()):
+                if key.startswith(old_prefix):
+                    data[new_prefix + key[len(old_prefix):]] = data.pop(key)
 
-        first_title
+        successor_lands = data.setdefault("successor_lands", {})
+        successor_lands.pop(f"successor_{successor_number}", None)
+        for current_number in range(successor_number + 1, successor_count + 1):
+            old_land_key = f"successor_{current_number}"
+            new_land_key = f"successor_{current_number - 1}"
+            if old_land_key in successor_lands:
+                successor_lands[new_land_key] = successor_lands.pop(old_land_key)
 
-    )
+        new_count = max(1, successor_count - 1)
+        st.session_state[f"{sheet}_successor_count"] = new_count
+        data["successor_count"] = new_count
 
 
-with second_column:
+    if selected_document == "SUCCESSION":
+        successor_count = st.session_state.get(f"{sheet}_successor_count", 1)
+        all_successor_total_guntas = 0
 
-    person_form(
+        # Successor 1 is the main right-side person. Its land stays directly with the succession section.
+        all_successor_total_guntas += render_successor_land(1)
 
-        "second",
+        # Additional successors are compact: two successor cards per row.
+        successor_numbers = list(range(2, successor_count + 1))
+        for row_start in range(0, len(successor_numbers), 2):
+            row_numbers = successor_numbers[row_start:row_start + 2]
+            row_columns = st.columns(len(row_numbers), gap="small")
+            for successor_number, successor_column in zip(row_numbers, row_columns):
+                with successor_column:
+                    with st.container(border=True):
+                        title_col, delete_col = st.columns([5, 1])
+                        with title_col:
+                            st.markdown(
+                                f"<div style='font-size:0.95rem;font-weight:750;margin:0 0 0.15rem 0;'>SUCCESSOR {successor_number}</div>",
+                                unsafe_allow_html=True
+                            )
+                        with delete_col:
+                            if st.button("🗑️", key=f"{sheet}_delete_successor_{successor_number}", help="Delete successor and linked land"):
+                                delete_successor(successor_number, successor_count)
+                                st.rerun()
+                        person_form(f"successor_{successor_number}", "SUCCESSOR", ppb_optional=True)
+                        all_successor_total_guntas += render_successor_land(successor_number)
 
-        second_title,
+        add_col, _ = st.columns([0.9, 3.1], gap="small")
+        with add_col:
+            if st.button("➕ ADD SUCCESSOR", key=f"{sheet}_add_successor", use_container_width=False):
+                st.session_state[f"{sheet}_successor_count"] += 1
+                st.rerun()
 
-        include_transaction=True,
+        all_acres = all_successor_total_guntas // 40
+        all_remaining_guntas = all_successor_total_guntas % 40
+        all_successors_extent = f"{all_acres}.{all_remaining_guntas:02d}00"
+        st.markdown("#### 🌾 TOTAL EXTENT — ALL SUCCESSORS")
+        total_all_col, _ = st.columns([0.9, 3.1], gap="small")
+        all_total_widget_key = f"{sheet}_all_successors_total_extent"
+        st.session_state[all_total_widget_key] = all_successors_extent
+        with total_all_col:
+            st.text_input("TOTAL EXTENT", value=all_successors_extent, disabled=True, key=all_total_widget_key)
+    st.divider()
 
-        ppb_optional=True,
+    # =========================================================
+    # LAND DETAILS — STEP 3
+    # =========================================================
+    land_column = st.container()
 
-        show_caste_gender=(
 
-            selected_document in [
+    with land_column:
 
-                "SALE",
+        st.markdown(
 
-                "GIFT"
+            """
+
+            <div class="section-title land-details-title">
+
+            🌾 LAND DETAILS
+
+            </div>
+
+            """,
+
+            unsafe_allow_html=True
+
+        )
+
+
+        if st.button(
+
+            "➕ ADD NEW SURVEY NO.",
+
+            use_container_width=True,
+
+            key=(
+
+                f"{sheet}_"
+
+                "add_survey"
+
+            )
+
+        ):
+
+            collect_data()
+
+
+            existing_ids = [
+
+                survey["id"]
+
+                for survey in
+
+                data["surveys"]
 
             ]
 
-        ),
 
-        is_bank=(
+            new_id = (
 
-            selected_document == "MORTGAGE"
+                max(
+                    existing_ids
+                )
+                +
+                1
 
-        )
+                if existing_ids
 
-    )
+                else 1
 
-
-# =========================================================
-# SUCCESSION — SUCCESSOR-WISE LAND DETAILS
-# =========================================================
-def render_successor_land(successor_number):
-    """Render land details directly under one successor and return total guntas."""
-    land_key = f"successor_{successor_number}"
-    successor_lands = data.setdefault("successor_lands", {})
-    allocations = successor_lands.setdefault(land_key, [])
-
-    with st.container(border=True):
-        st.markdown(f"#### 🌾 LAND DETAILS — SUCCESSOR {successor_number}")
-
-        top_left, top_right = st.columns([3, 1])
-        with top_left:
-            if st.button("➕ ADD SURVEY", key=f"{sheet}_{land_key}_add_land", use_container_width=True):
-                collect_data()
-                existing_ids = [item.get("id", 0) for item in allocations]
-                new_id = max(existing_ids) + 1 if existing_ids else 1
-                allocations.append({"id": new_id, "survey_number": "", "extent": "", "north": "", "south": "", "east": "", "west": ""})
-                save_database()
-                st.rerun()
-        with top_right:
-            st.caption("Add land for this successor")
-
-        total_guntas = 0
-        for allocation in allocations.copy():
-            allocation_id = allocation.get("id")
-            with st.container(border=True):
-                survey_col, extent_col, delete_col = st.columns([1.5, 1.1, 0.45])
-                with survey_col:
-                    st.text_input("Survey No.", value=allocation.get("survey_number", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_survey_number")
-                with extent_col:
-                    allocation_extent = st.text_input("Extent", value=allocation.get("extent", ""), placeholder="1.1500", key=f"{sheet}_{land_key}_land_{allocation_id}_extent")
-                with delete_col:
-                    st.caption("Delete")
-                    if st.button("🗑️", key=f"{sheet}_{land_key}_delete_land_{allocation_id}", use_container_width=True):
-                        collect_data()
-                        successor_lands[land_key] = [item for item in allocations if item.get("id") != allocation_id]
-                        save_database()
-                        st.rerun()
-
-                north_col, south_col, east_col, west_col = st.columns(4)
-                with north_col:
-                    st.text_input("North", value=allocation.get("north", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_north")
-                with south_col:
-                    st.text_input("South", value=allocation.get("south", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_south")
-                with east_col:
-                    st.text_input("East", value=allocation.get("east", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_east")
-                with west_col:
-                    st.text_input("West", value=allocation.get("west", ""), key=f"{sheet}_{land_key}_land_{allocation_id}_west")
-
-                cleaned_extent = clean_extent(allocation_extent)
-                converted_extent = extent_guntas(cleaned_extent)
-                if allocation_extent and converted_extent is None:
-                    st.error("Invalid extent. Example: 1.1500 (guntas 00–39).")
-                elif converted_extent is not None:
-                    total_guntas += converted_extent
-
-        total_acres = total_guntas // 40
-        remaining_guntas = total_guntas % 40
-        total_extent = f"{total_acres}.{remaining_guntas:02d}00"
-        total_col, _ = st.columns([1.2, 2.8])
-        total_widget_key = f"{sheet}_{land_key}_total_extent"
-        # This is a calculated field, so refresh its widget value on every rerun.
-        # Otherwise Streamlit keeps the old disabled value (often 0.0000).
-        st.session_state[total_widget_key] = total_extent
-        with total_col:
-            st.text_input("TOTAL EXTENT", value=total_extent, disabled=True, key=total_widget_key)
-
-    return total_guntas
+            )
 
 
-# =========================================================
-# SUCCESSION — ADDITIONAL SUCCESSORS + LINKED LAND
-# =========================================================
-def delete_successor(successor_number, successor_count):
-    delete_prefix = f"{sheet}_successor_{successor_number}_"
-    for key in list(st.session_state.keys()):
-        if key.startswith(delete_prefix):
-            del st.session_state[key]
+            data["surveys"].append(
 
-    for current_number in range(successor_number + 1, successor_count + 1):
-        old_prefix = f"{sheet}_successor_{current_number}_"
-        new_prefix = f"{sheet}_successor_{current_number - 1}_"
-        for key in list(st.session_state.keys()):
-            if key.startswith(old_prefix):
-                st.session_state[new_prefix + key[len(old_prefix):]] = st.session_state.pop(key)
+                {
 
-    for key in list(data.keys()):
-        if key.startswith(f"successor_{successor_number}_"):
-            del data[key]
+                    "id": new_id,
 
-    for current_number in range(successor_number + 1, successor_count + 1):
-        old_prefix = f"successor_{current_number}_"
-        new_prefix = f"successor_{current_number - 1}_"
-        for key in list(data.keys()):
-            if key.startswith(old_prefix):
-                data[new_prefix + key[len(old_prefix):]] = data.pop(key)
+                    "survey_number": "",
 
-    successor_lands = data.setdefault("successor_lands", {})
-    successor_lands.pop(f"successor_{successor_number}", None)
-    for current_number in range(successor_number + 1, successor_count + 1):
-        old_land_key = f"successor_{current_number}"
-        new_land_key = f"successor_{current_number - 1}"
-        if old_land_key in successor_lands:
-            successor_lands[new_land_key] = successor_lands.pop(old_land_key)
+                    "extent": "",
 
-    new_count = max(1, successor_count - 1)
-    st.session_state[f"{sheet}_successor_count"] = new_count
-    data["successor_count"] = new_count
+                    "north": "",
+
+                    "south": "",
+
+                    "east": "",
+
+                    "west": ""
+
+                }
+
+            )
 
 
-if selected_document == "SUCCESSION":
-    successor_count = st.session_state.get(f"{sheet}_successor_count", 1)
-    all_successor_total_guntas = 0
+            save_database()
 
-    # Successor 1 is the main right-side person. Its land stays directly with the succession section.
-    all_successor_total_guntas += render_successor_land(1)
 
-    # Additional successors are compact: two successor cards per row.
-    successor_numbers = list(range(2, successor_count + 1))
-    for row_start in range(0, len(successor_numbers), 2):
-        row_numbers = successor_numbers[row_start:row_start + 2]
-        row_columns = st.columns(len(row_numbers), gap="small")
-        for successor_number, successor_column in zip(row_numbers, row_columns):
-            with successor_column:
-                with st.container(border=True):
-                    title_col, delete_col = st.columns([5, 1])
-                    with title_col:
-                        st.markdown(
-                            f"<div style='font-size:0.95rem;font-weight:750;margin:0 0 0.15rem 0;'>SUCCESSOR {successor_number}</div>",
-                            unsafe_allow_html=True
-                        )
-                    with delete_col:
-                        if st.button("🗑️", key=f"{sheet}_delete_successor_{successor_number}", help="Delete successor and linked land"):
-                            delete_successor(successor_number, successor_count)
-                            st.rerun()
-                    person_form(f"successor_{successor_number}", "SUCCESSOR", ppb_optional=True)
-                    all_successor_total_guntas += render_successor_land(successor_number)
-
-    add_col, _ = st.columns([0.9, 3.1], gap="small")
-    with add_col:
-        if st.button("➕ ADD SUCCESSOR", key=f"{sheet}_add_successor", use_container_width=False):
-            st.session_state[f"{sheet}_successor_count"] += 1
             st.rerun()
 
-    all_acres = all_successor_total_guntas // 40
-    all_remaining_guntas = all_successor_total_guntas % 40
-    all_successors_extent = f"{all_acres}.{all_remaining_guntas:02d}00"
-    st.markdown("#### 🌾 TOTAL EXTENT — ALL SUCCESSORS")
-    total_all_col, _ = st.columns([0.9, 3.1], gap="small")
-    all_total_widget_key = f"{sheet}_all_successors_total_extent"
-    st.session_state[all_total_widget_key] = all_successors_extent
-    with total_all_col:
-        st.text_input("TOTAL EXTENT", value=all_successors_extent, disabled=True, key=all_total_widget_key)
-st.divider()
+
+        live_total_guntas = 0
+
+        invalid_extent = False
 
 
-# =========================================================
-# LAND AND PAYMENT SPLIT VIEW
-# =========================================================
-
-if selected_document == "SUCCESSION":
-    payment_column = st.container()
-else:
-    land_column, payment_column = st.columns(2, gap="medium")
-
-
-# =========================================================
-# LAND DETAILS
-# =========================================================
-
-with land_column:
-
-    st.markdown(
-
-        """
-
-        <div class="section-title land-details-title">
-
-        🌾 LAND DETAILS
-
-        </div>
-
-        """,
-
-        unsafe_allow_html=True
-
-    )
-
-
-    if st.button(
-
-        "➕ ADD NEW SURVEY NO.",
-
-        use_container_width=True,
-
-        key=(
-
-            f"{sheet}_"
-
-            "add_survey"
-
-        )
-
-    ):
-
-        collect_data()
-
-
-        existing_ids = [
-
-            survey["id"]
-
-            for survey in
-
-            data["surveys"]
-
-        ]
-
-
-        new_id = (
-
-            max(
-                existing_ids
-            )
-            +
-            1
-
-            if existing_ids
-
-            else 1
-
-        )
-
-
-        data["surveys"].append(
-
-            {
-
-                "id": new_id,
-
-                "survey_number": "",
-
-                "extent": "",
-
-                "north": "",
-
-                "south": "",
-
-                "east": "",
-
-                "west": ""
-
-            }
-
-        )
-
-
-        save_database()
-
-
-        st.rerun()
-
-
-    live_total_guntas = 0
-
-    invalid_extent = False
-
-
-    for survey in (
-        data["surveys"].copy()
-    ):
-
-        survey_id = (
-            survey["id"]
-        )
-
-
-        with st.container(
-            border=True
+        for survey in (
+            data["surveys"].copy()
         ):
 
-            survey_column, extent_column, delete_column = (
-
-                st.columns(
-
-                    [
-
-                        2,
-
-                        1.4,
-
-                        0.6
-
-                    ]
-
-                )
-
+            survey_id = (
+                survey["id"]
             )
 
 
-            with survey_column:
+            with st.container(
+                border=True
+            ):
 
-                st.text_input(
+                survey_column, extent_column, delete_column = (
 
-                    "Survey No.",
+                    st.columns(
 
-                    value=(
+                        [
 
-                        survey.get(
+                            2,
 
-                            "survey_number",
+                            1.4,
 
-                            ""
+                            0.6
 
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "survey_number"
+                        ]
 
                     )
 
                 )
 
 
-            with extent_column:
-
-                extent_value = (
+                with survey_column:
 
                     st.text_input(
 
-                        "Extent",
+                        "Survey No.",
 
                         value=(
 
                             survey.get(
 
-                                "extent",
+                                "survey_number",
 
                                 ""
 
                             )
 
                         ),
-
-                        placeholder=(
-
-                            "Example: 1.1500"
-
-                        ),
-
-                        max_chars=20,
 
                         key=(
 
@@ -5525,12 +5378,580 @@ with land_column:
 
                             f"{survey_id}_"
 
-                            "extent"
+                            "survey_number"
 
                         )
 
                     )
 
+
+                with extent_column:
+
+                    extent_value = (
+
+                        st.text_input(
+
+                            "Extent",
+
+                            value=(
+
+                                survey.get(
+
+                                    "extent",
+
+                                    ""
+
+                                )
+
+                            ),
+
+                            placeholder=(
+
+                                "Example: 1.1500"
+
+                            ),
+
+                            max_chars=20,
+
+                            key=(
+
+                                f"{sheet}_"
+
+                                f"survey_"
+
+                                f"{survey_id}_"
+
+                                "extent"
+
+                            )
+
+                        )
+
+                    )
+
+
+                with delete_column:
+
+                    st.caption(
+                        "DELETE"
+                    )
+
+
+                    if st.button(
+
+                        "🗑️",
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"delete_survey_"
+
+                            f"{survey_id}"
+
+                        ),
+
+                        use_container_width=True
+
+                    ):
+
+                        collect_data()
+
+
+                        data["surveys"] = [
+
+                            item
+
+                            for item in
+
+                            data["surveys"]
+
+                            if item["id"]
+
+                            != survey_id
+
+                        ]
+
+
+                        save_database()
+
+
+                        st.rerun()
+
+
+                north_column, south_column = (
+
+                    st.columns(2)
+
+                )
+
+
+                with north_column:
+
+                    st.text_input(
+
+                        "North",
+
+                        value=(
+
+                            survey.get(
+
+                                "north",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "north"
+
+                        )
+
+                    )
+
+
+                with south_column:
+
+                    st.text_input(
+
+                        "South",
+
+                        value=(
+
+                            survey.get(
+
+                                "south",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "south"
+
+                        )
+
+                    )
+
+
+                east_column, west_column = (
+
+                    st.columns(2)
+
+                )
+
+
+                with east_column:
+
+                    st.text_input(
+
+                        "East",
+
+                        value=(
+
+                            survey.get(
+
+                                "east",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "east"
+
+                        )
+
+                    )
+
+
+                with west_column:
+
+                    st.text_input(
+
+                        "West",
+
+                        value=(
+
+                            survey.get(
+
+                                "west",
+
+                                ""
+
+                            )
+
+                        ),
+
+                        key=(
+
+                            f"{sheet}_"
+
+                            f"survey_"
+
+                            f"{survey_id}_"
+
+                            "west"
+
+                        )
+
+                    )
+
+
+                cleaned_live_extent = (
+
+                    clean_extent(
+
+                        extent_value
+
+                    )
+
+                )
+
+
+                if (
+                    extent_value
+
+                    !=
+
+                    cleaned_live_extent
+                ):
+
+                    st.warning(
+
+                        "Extent allows numbers, "
+
+                        "one decimal point and "
+
+                        "a maximum of four digits "
+
+                        "after the decimal."
+
+                    )
+
+
+                converted_extent = (
+
+                    extent_guntas(
+
+                        cleaned_live_extent
+
+                    )
+
+                )
+
+
+                if converted_extent is None:
+
+                    invalid_extent = True
+
+
+                    st.error(
+
+                        "Invalid extent. Use a "
+
+                        "format such as 1.1500. "
+
+                        "The first two digits "
+
+                        "after the decimal are "
+
+                        "guntas and must be "
+
+                        "between 00 and 39."
+
+                    )
+
+
+                else:
+
+                    live_total_guntas += (
+
+                        converted_extent
+
+                    )
+
+
+        total_acres = (
+
+            live_total_guntas
+
+            // 40
+
+        )
+
+
+        remaining_guntas = (
+
+            live_total_guntas
+
+            % 40
+
+        )
+
+
+        live_total_extent = (
+
+            f"{total_acres}."
+
+            f"{remaining_guntas:02d}"
+
+            "00"
+
+        )
+
+    total_extent_box = st.container(border=True)
+
+    with total_extent_box:
+        st.markdown("### TOTAL EXTENT")
+
+        st.markdown(
+            f"## {live_total_extent}"
+        )
+
+
+elif current_step == 4:
+    # STEP 4 — PAYMENT DETAILS ONLY
+    # =========================================================
+    # PAYMENT DETAILS — STEP 4
+    # =========================================================
+    payment_column = st.container()
+
+    with payment_column:
+
+        st.markdown(
+
+            """
+
+            <div class="section-title payment-details-title">
+
+            💰 PAYMENT DETAILS
+
+            </div>
+
+            """,
+
+            unsafe_allow_html=True
+
+        )
+
+
+        # Payment summary fields: each is 30% of its original width.
+        # The final 10% is intentionally left empty for later use.
+        challan_column, charges_column, total_payable_column, payment_spacer = st.columns(
+            [0.3, 0.3, 0.3, 0.1]
+        )
+
+        with challan_column:
+            challan_amount = st.number_input(
+                "Challan Rs.",
+                min_value=0.0,
+                value=float(data.get("challan_amount", 0)),
+                step=100.0,
+                key=f"{sheet}_challan_amount"
+            )
+
+        with charges_column:
+            # Additional payment details for all document types.
+            charges = st.number_input(
+                "CHARGES",
+                min_value=0.0,
+                value=float(data.get("charges", 0.0)),
+                step=100.0,
+                key=f"{sheet}_charges"
+            )
+
+        # Keep the current widget values in sheet data immediately.
+        data["challan_amount"] = float(challan_amount)
+        data["charges"] = float(charges)
+
+        # Automatically calculated from Challan + Charges.
+        total_payable = float(challan_amount) + float(charges)
+        data["total_payable"] = total_payable
+
+        total_payable_key = f"{sheet}_total_payable"
+        st.session_state[total_payable_key] = f"{total_payable:,.2f}"
+        with total_payable_column:
+            st.text_input(
+                "TOTAL PAYABLE",
+                key=total_payable_key,
+                disabled=True
+            )
+
+        if st.button(
+
+            "➕ ADD ANOTHER PAYMENT",
+
+            use_container_width=False,
+
+            key=(
+
+                f"{sheet}_"
+
+                "add_payment"
+
+            )
+
+        ):
+
+            collect_data()
+
+
+            existing_payment_ids = [
+
+                payment["id"]
+
+                for payment in
+
+                data["payments"]
+
+            ]
+
+
+            new_payment_id = (
+
+                max(
+                    existing_payment_ids
+                )
+                +
+                1
+
+                if existing_payment_ids
+
+                else 1
+
+            )
+
+
+            data["payments"].append(
+
+                {
+
+                    "id":
+                    new_payment_id,
+
+                    "amount":
+                    0.0,
+
+                    "payment_mode":
+                    "CASH"
+
+                }
+
+            )
+
+
+            save_database()
+
+
+            st.rerun()
+
+
+        payment_values = []
+        total_paid_placeholder = None
+
+
+        for payment in (
+            data["payments"].copy()
+        ):
+
+            payment_id = (
+                payment["id"]
+            )
+
+
+            amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 1.15, 0.35])
+
+
+            with amount_column:
+
+                amount = (
+
+                    st.number_input(
+
+                            f"Amount Paid "
+                            f"{payment_id}",
+
+                            min_value=0.0,
+
+                            value=float(
+
+                                payment.get(
+
+                                    "amount",
+
+                                    0
+
+                                )
+
+                            ),
+
+                            step=100.0,
+
+                            key=(
+
+                                f"{sheet}_"
+
+                                f"payment_"
+
+                                f"{payment_id}"
+
+                            )
+
+                    )
+
+                )
+
+
+            with total_paid_column:
+                # Total Paid: increased to 120% of its original field width.
+                if payment_id == data["payments"][0]["id"]:
+                    total_paid_placeholder = st.empty()
+
+            with mode_column:
+
+                st.markdown(
+                    '<div class="payment-mode-title">PAYMENT MODE</div>',
+                    unsafe_allow_html=True
+                )
+
+                payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
+                saved_payment_mode = str(payment.get("payment_mode", "CASH"))
+                if saved_payment_mode not in payment_mode_options:
+                    saved_payment_mode = "CASH"
+
+                payment_mode = st.selectbox(
+                    " ",
+                    payment_mode_options,
+                    index=payment_mode_options.index(saved_payment_mode),
+                    key=f"{sheet}_payment_mode_{payment_id}"
                 )
 
 
@@ -5549,9 +5970,9 @@ with land_column:
 
                         f"{sheet}_"
 
-                        f"delete_survey_"
+                        f"delete_payment_"
 
-                        f"{survey_id}"
+                        f"{payment_id}"
 
                     ),
 
@@ -5562,17 +5983,17 @@ with land_column:
                     collect_data()
 
 
-                    data["surveys"] = [
+                    data["payments"] = [
 
                         item
 
                         for item in
 
-                        data["surveys"]
+                        data["payments"]
 
                         if item["id"]
 
-                        != survey_id
+                        != payment_id
 
                     ]
 
@@ -5583,1054 +6004,558 @@ with land_column:
                     st.rerun()
 
 
-            north_column, south_column = (
+            # Keep the live value in the current sheet data so totals and later saves
+            # always use what is currently entered in the widgets.
+            payment["amount"] = float(amount)
+            payment["payment_mode"] = payment_mode
+            payment_values.append(float(amount))
 
-                st.columns(2)
 
-            )
+        # Calculate the totals LIVE from every visible payment row.
+        total_paid = sum(
+            payment_values
+        )
 
+        # Keep calculated values in the current sheet data as well.
+        data["total_paid"] = float(total_paid)
+        data["total_payable"] = float(total_payable)
 
-            with north_column:
-
+        if total_paid_placeholder is not None:
+            total_paid_key = f"{sheet}_total_paid_display"
+            st.session_state[total_paid_key] = f"{total_paid:,.2f}"
+            with total_paid_placeholder.container():
                 st.text_input(
-
-                    "North",
-
-                    value=(
-
-                        survey.get(
-
-                            "north",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "north"
-
-                    )
-
+                    "Total Paid",
+                    key=total_paid_key,
+                    disabled=True
                 )
 
 
-            with south_column:
+        # Keep Balance Amount, Date of Slot Booked and Booking Status on one straight line.
+        # Reduce each field to a compact width appropriate to its content.
+        balance_column, date_slot_column, status_column, _booking_right_spacer = st.columns(
+            [0.75, 1.0, 0.85, 0.4]
+        )
 
-                st.text_input(
+        with balance_column:
 
-                    "South",
+            balance = (
 
-                    value=(
+                total_payable
 
-                        survey.get(
+                -
 
-                            "south",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "south"
-
-                    )
-
-                )
-
-
-            east_column, west_column = (
-
-                st.columns(2)
+                total_paid
 
             )
 
 
-            with east_column:
+            data["balance_amount"] = float(balance)
 
-                st.text_input(
-
-                    "East",
-
-                    value=(
-
-                        survey.get(
-
-                            "east",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "east"
-
-                    )
-
-                )
-
-
-            with west_column:
-
-                st.text_input(
-
-                    "West",
-
-                    value=(
-
-                        survey.get(
-
-                            "west",
-
-                            ""
-
-                        )
-
-                    ),
-
-                    key=(
-
-                        f"{sheet}_"
-
-                        f"survey_"
-
-                        f"{survey_id}_"
-
-                        "west"
-
-                    )
-
-                )
-
-
-            cleaned_live_extent = (
-
-                clean_extent(
-
-                    extent_value
-
-                )
-
+            balance_key = f"{sheet}_balance_amount_display"
+            st.session_state[balance_key] = f"{balance:,.2f}"
+            st.text_input(
+                "Balance Amount",
+                key=balance_key,
+                disabled=True
             )
 
 
-            if (
-                extent_value
+        with date_slot_column:
 
-                !=
+            st.date_input(
 
-                cleaned_live_extent
-            ):
+                "Date of Slot Booked",
 
-                st.warning(
+                value=(
 
-                    "Extent allows numbers, "
+                    safe_date(
 
-                    "one decimal point and "
+                        data.get(
 
-                    "a maximum of four digits "
+                            "slot_date",
 
-                    "after the decimal."
+                            str(
 
-                )
-
-
-            converted_extent = (
-
-                extent_guntas(
-
-                    cleaned_live_extent
-
-                )
-
-            )
-
-
-            if converted_extent is None:
-
-                invalid_extent = True
-
-
-                st.error(
-
-                    "Invalid extent. Use a "
-
-                    "format such as 1.1500. "
-
-                    "The first two digits "
-
-                    "after the decimal are "
-
-                    "guntas and must be "
-
-                    "between 00 and 39."
-
-                )
-
-
-            else:
-
-                live_total_guntas += (
-
-                    converted_extent
-
-                )
-
-
-    total_acres = (
-
-        live_total_guntas
-
-        // 40
-
-    )
-
-
-    remaining_guntas = (
-
-        live_total_guntas
-
-        % 40
-
-    )
-
-
-    live_total_extent = (
-
-        f"{total_acres}."
-
-        f"{remaining_guntas:02d}"
-
-        "00"
-
-    )
-
-total_extent_box = st.container(border=True)
-
-with total_extent_box:
-    st.markdown("### TOTAL EXTENT")
-
-    st.markdown(
-        f"## {live_total_extent}"
-    )
-
-
-# =========================================================
-# PAYMENT DETAILS
-# =========================================================
-
-with payment_column:
-
-    st.markdown(
-
-        """
-
-        <div class="section-title payment-details-title">
-
-        💰 PAYMENT DETAILS
-
-        </div>
-
-        """,
-
-        unsafe_allow_html=True
-
-    )
-
-
-    # Payment summary fields: each is 30% of its original width.
-    # The final 10% is intentionally left empty for later use.
-    challan_column, charges_column, total_payable_column, payment_spacer = st.columns(
-        [0.3, 0.3, 0.3, 0.1]
-    )
-
-    with challan_column:
-        challan_amount = st.number_input(
-            "Challan Rs.",
-            min_value=0.0,
-            value=float(data.get("challan_amount", 0)),
-            step=100.0,
-            key=f"{sheet}_challan_amount"
-        )
-
-    with charges_column:
-        # Additional payment details for all document types.
-        charges = st.number_input(
-            "CHARGES",
-            min_value=0.0,
-            value=float(data.get("charges", 0.0)),
-            step=100.0,
-            key=f"{sheet}_charges"
-        )
-
-    # Keep the current widget values in sheet data immediately.
-    data["challan_amount"] = float(challan_amount)
-    data["charges"] = float(charges)
-
-    # Automatically calculated from Challan + Charges.
-    total_payable = float(challan_amount) + float(charges)
-    data["total_payable"] = total_payable
-
-    total_payable_key = f"{sheet}_total_payable"
-    st.session_state[total_payable_key] = f"{total_payable:,.2f}"
-    with total_payable_column:
-        st.text_input(
-            "TOTAL PAYABLE",
-            key=total_payable_key,
-            disabled=True
-        )
-
-    if st.button(
-
-        "➕ ADD ANOTHER PAYMENT",
-
-        use_container_width=False,
-
-        key=(
-
-            f"{sheet}_"
-
-            "add_payment"
-
-        )
-
-    ):
-
-        collect_data()
-
-
-        existing_payment_ids = [
-
-            payment["id"]
-
-            for payment in
-
-            data["payments"]
-
-        ]
-
-
-        new_payment_id = (
-
-            max(
-                existing_payment_ids
-            )
-            +
-            1
-
-            if existing_payment_ids
-
-            else 1
-
-        )
-
-
-        data["payments"].append(
-
-            {
-
-                "id":
-                new_payment_id,
-
-                "amount":
-                0.0,
-
-                "payment_mode":
-                "CASH"
-
-            }
-
-        )
-
-
-        save_database()
-
-
-        st.rerun()
-
-
-    payment_values = []
-    total_paid_placeholder = None
-
-
-    for payment in (
-        data["payments"].copy()
-    ):
-
-        payment_id = (
-            payment["id"]
-        )
-
-
-        amount_column, total_paid_column, mode_column, delete_column, _payment_right_spacer = st.columns([3.4, 2.3, 2.8, 1.15, 0.35])
-
-
-        with amount_column:
-
-            amount = (
-
-                st.number_input(
-
-                        f"Amount Paid "
-                        f"{payment_id}",
-
-                        min_value=0.0,
-
-                        value=float(
-
-                            payment.get(
-
-                                "amount",
-
-                                0
+                                date.today()
 
                             )
 
-                        ),
-
-                        step=100.0,
-
-                        key=(
-
-                            f"{sheet}_"
-
-                            f"payment_"
-
-                            f"{payment_id}"
-
                         )
 
-                )
+                    )
 
-            )
-
-
-        with total_paid_column:
-            # Total Paid: increased to 120% of its original field width.
-            if payment_id == data["payments"][0]["id"]:
-                total_paid_placeholder = st.empty()
-
-        with mode_column:
-
-            st.markdown(
-                '<div class="payment-mode-title">PAYMENT MODE</div>',
-                unsafe_allow_html=True
-            )
-
-            payment_mode_options = ["CASH", "PHONEPE/G-PAY"]
-            saved_payment_mode = str(payment.get("payment_mode", "CASH"))
-            if saved_payment_mode not in payment_mode_options:
-                saved_payment_mode = "CASH"
-
-            payment_mode = st.selectbox(
-                " ",
-                payment_mode_options,
-                index=payment_mode_options.index(saved_payment_mode),
-                key=f"{sheet}_payment_mode_{payment_id}"
-            )
-
-
-        with delete_column:
-
-            st.caption(
-                "DELETE"
-            )
-
-
-            if st.button(
-
-                "🗑️",
+                ),
 
                 key=(
 
                     f"{sheet}_"
 
-                    f"delete_payment_"
+                    "slot_date"
 
-                    f"{payment_id}"
+                )
+
+            )
+
+
+        status_options = [
+
+            "STATUS PENDING",
+
+            "REG. COMPLETED"
+
+        ]
+
+
+        saved_status = (
+
+            data.get(
+
+                "booking_status",
+
+                "STATUS PENDING"
+
+            )
+
+        )
+
+
+        if saved_status not in (
+            status_options
+        ):
+
+            saved_status = (
+                "STATUS PENDING"
+            )
+
+
+        with status_column:
+
+            st.selectbox(
+
+                "Booking Status",
+
+                status_options,
+
+                index=(
+
+                    status_options.index(
+
+                        saved_status
+
+                    )
 
                 ),
 
-                use_container_width=True
+                key=(
 
-            ):
+                    f"{sheet}_"
 
-                collect_data()
+                    "booking_status"
+
+                )
+
+            )
 
 
-                data["payments"] = [
+        st.text_area(
 
-                    item
+            "Notes",
 
-                    for item in
+            value=(
 
-                    data["payments"]
+                data.get(
 
-                    if item["id"]
+                    "notes",
 
-                    != payment_id
+                    ""
 
+                )
+
+            ),
+
+            height=70,
+
+            key=(
+
+                f"{sheet}_"
+
+                "notes"
+
+            )
+
+        )
+
+
+    st.divider()
+
+
+
+# Persist the current page as a draft after its widgets have rendered.
+collect_data()
+save_database()
+
+# =========================================================
+# PAGE NAVIGATION
+# =========================================================
+nav_prev, nav_spacer, nav_next = st.columns([1, 2, 1])
+with nav_prev:
+    if current_step > 1 and st.button("⬅️ PREVIOUS", use_container_width=True, key=f"{sheet}_prev_step_{current_step}"):
+        collect_data()
+        save_database()
+        st.session_state.document_step = current_step - 1
+        st.rerun()
+with nav_next:
+    if current_step < 4 and st.button("NEXT ➡️", type="primary", use_container_width=True, key=f"{sheet}_next_step_{current_step}"):
+        collect_data()
+        save_database()
+        st.session_state.document_step = current_step + 1
+        st.rerun()
+
+# =========================================================
+# STEP 4 — SAVE / PDF / DOCUMENT ACTIONS
+# =========================================================
+if current_step == 4:
+    # =========================================================
+    # FINAL ACTIONS
+    # =========================================================
+
+    # =========================================================
+    # AUTO-SAVE CURRENT DRAFT
+    # Keeps the current sheet and entered details available after a refresh.
+    # =========================================================
+    collect_data()
+    save_database()
+
+
+    st.markdown(
+        '<div class="section-title">💾 SAVE & DOCUMENT ACTIONS</div>',
+        unsafe_allow_html=True
+    )
+
+    def _get_email_settings():
+        """Read email settings from Streamlit secrets or environment variables."""
+        try:
+            cfg = st.secrets.get("email", {})
+        except Exception:
+            cfg = {}
+
+        sender = cfg.get("sender") or os.getenv("NSMART_EMAIL_SENDER")
+        password = cfg.get("password") or os.getenv("NSMART_EMAIL_PASSWORD")
+        recipient = cfg.get("recipient") or os.getenv("NSMART_EMAIL_RECIPIENT")
+        smtp_server = cfg.get("smtp_server") or os.getenv("NSMART_SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(cfg.get("smtp_port") or os.getenv("NSMART_SMTP_PORT", "465"))
+
+        return sender, password, recipient, smtp_server, smtp_port
+
+
+    def _send_pdf_email(sheet_name, pdf_data, recipient_override=None):
+        sender, password, configured_recipient, smtp_server, smtp_port = _get_email_settings()
+        recipient = (recipient_override or configured_recipient or "").strip()
+
+        if not sender or not password:
+            return False, "Email is not configured yet. Add the email settings first."
+        if not recipient:
+            return False, "No recipient email address is configured."
+
+        msg = EmailMessage()
+        msg["Subject"] = f"N-SMART - {sheet_name}"
+        msg["From"] = sender
+        msg["To"] = recipient
+        msg.set_content(
+            f"Attached is the N-SMART document PDF for {sheet_name}.\n\n"
+            "This email was sent from N-SMART Online Services."
+        )
+        msg.add_attachment(
+            pdf_data,
+            maintype="application",
+            subtype="pdf",
+            filename=f"{sheet_name}.pdf"
+        )
+
+        try:
+            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as smtp:
+                smtp.login(sender, password)
+                smtp.send_message(msg)
+            return True, f"{sheet_name}.pdf sent successfully to {recipient}."
+        except Exception as exc:
+            return False, f"Email could not be sent: {exc}"
+
+
+
+
+    # =========================================================
+    # SAVE FILE
+    # =========================================================
+
+    # =========================================================
+    # SAVE + DOWNLOAD + PRINT ACTIONS
+    # =========================================================
+
+    # Keep the three actions together. If this sheet has already been saved,
+    # use the existing PDF; otherwise build a temporary PDF from the current data
+    # so Download/Print are still available without removing any existing features.
+    _current_sheet_for_actions = st.session_state.get("current_sheet", sheet)
+
+    # Always rebuild the action PDF from the current cloud-loaded sheet data.
+    # This prevents an old landscape PDF from being reused after the print
+    # layout has been changed.
+    _current_data_for_actions = st.session_state.database.get(
+        _current_sheet_for_actions,
+        {}
+    )
+    _current_pdf_for_actions = create_pdf(
+        _current_sheet_for_actions,
+        _current_data_for_actions
+    )
+    st.session_state["saved_pdf"] = _current_pdf_for_actions
+    st.session_state["saved_sheet"] = _current_sheet_for_actions
+
+    _action_save_col, _action_download_col, _action_print_col = st.columns(3)
+
+    with _action_download_col:
+        if _current_pdf_for_actions:
+            st.download_button(
+                "📄 DOWNLOAD PDF",
+                data=_current_pdf_for_actions,
+                file_name=f"{_current_sheet_for_actions}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"download_pdf_near_save_{_current_sheet_for_actions}"
+            )
+        else:
+            st.button(
+                "📄 DOWNLOAD PDF",
+                disabled=True,
+                use_container_width=True,
+                key=f"download_pdf_disabled_{_current_sheet_for_actions}",
+                help="Save the file once to generate the PDF."
+            )
+
+    with _action_print_col:
+        if _current_pdf_for_actions:
+            # Use a Blob URL instead of a huge data: URL. Some browsers open large
+            # PDF data URLs as blank pages, which was causing the blank print window.
+            _print_b64 = base64.b64encode(
+                _current_pdf_for_actions
+            ).decode("utf-8")
+
+            _print_html = f"""
+            <html>
+            <body style="margin:0;padding:0;">
+                <button id="printBtn" style="
+                    width:100%;
+                    border:none;
+                    border-radius:8px;
+                    padding:0.62rem 0.8rem;
+                    font-size:14px;
+                    font-weight:700;
+                    cursor:pointer;
+                    background:#16a34a;
+                    color:white;
+                ">🖨️ PRINT DOCUMENT</button>
+
+                <script>
+                document.getElementById("printBtn").addEventListener("click", function() {{
+                    try {{
+                        const base64 = "{_print_b64}";
+                        const binary = atob(base64);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {{
+                            bytes[i] = binary.charCodeAt(i);
+                        }}
+
+                        const blob = new Blob([bytes], {{
+                            type: "application/pdf"
+                        }});
+                        const url = URL.createObjectURL(blob);
+
+                        const printWindow = window.open(url, "_blank");
+                        if (printWindow) {{
+                            setTimeout(function() {{
+                                try {{
+                                    printWindow.focus();
+                                    printWindow.print();
+                                }} catch (e) {{
+                                    console.error(e);
+                                }}
+                            }}, 1200);
+                        }} else {{
+                            alert("Please allow pop-ups to print the document.");
+                        }}
+                    }} catch (err) {{
+                        console.error(err);
+                        alert("Unable to prepare the document for printing.");
+                    }}
+                }});
+                </script>
+            </body>
+            </html>
+            """
+
+            st.components.v1.html(
+                _print_html,
+                height=52,
+                scrolling=False
+            )
+        else:
+            st.button(
+                "🖨️ PRINT DOCUMENT",
+                disabled=True,
+                use_container_width=True,
+                key=f"print_pdf_disabled_{_current_sheet_for_actions}",
+                help="Save the file once to generate the PDF."
+            )
+
+    with _action_save_col:
+        if st.button(
+            "💾 SAVE FILE",
+            type="primary",
+            use_container_width=True,
+            key=(
+                f"{sheet}_"
+                "save_file"
+            )
+        ):
+
+            collect_data()
+
+            data = (
+                st.session_state.database[
+                    sheet
                 ]
+            )
 
+            calculated_extent, invalid = (
+                total_extent(
+                    data["surveys"]
+                )
+            )
+
+            if invalid:
+
+                st.error(
+                    "The file was not saved. "
+                    "Correct the invalid "
+                    "extent first."
+                )
+
+            else:
+
+                data["saved"] = True
 
                 save_database()
 
+                pdf_bytes = (
+                    create_pdf(
+                        sheet,
+                        data
+                    )
+                )
+
+                pdf_path = (
+                    os.path.join(
+                        PDF_FOLDER,
+                        f"{sheet}.pdf"
+                    )
+                )
+
+                with open(
+                    pdf_path,
+                    "wb"
+                ) as pdf_file:
+
+                    pdf_file.write(
+                        pdf_bytes
+                    )
+
+                st.session_state[
+                    "saved_pdf"
+                ] = pdf_bytes
+
+                st.session_state[
+                    "saved_sheet"
+                ] = sheet
+
+                st.session_state[
+                    "show_saved_options"
+                ] = True
+
+                # Automatically send the generated PDF to the configured email on every save.
+                email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
+
+                if email_ok:
+                    st.success(f"{sheet} saved successfully. {email_message}")
+                else:
+                    st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
 
                 st.rerun()
 
 
-        # Keep the live value in the current sheet data so totals and later saves
-        # always use what is currently entered in the widgets.
-        payment["amount"] = float(amount)
-        payment["payment_mode"] = payment_mode
-        payment_values.append(float(amount))
+    # =========================================================
+    # PDF, PRINT AND NEXT SHEET
+    # =========================================================
 
+    if st.session_state.get(
 
-    # Calculate the totals LIVE from every visible payment row.
-    total_paid = sum(
-        payment_values
-    )
+        "show_saved_options",
 
-    # Keep calculated values in the current sheet data as well.
-    data["total_paid"] = float(total_paid)
-    data["total_payable"] = float(total_payable)
+        False
 
-    if total_paid_placeholder is not None:
-        total_paid_key = f"{sheet}_total_paid_display"
-        st.session_state[total_paid_key] = f"{total_paid:,.2f}"
-        with total_paid_placeholder.container():
-            st.text_input(
-                "Total Paid",
-                key=total_paid_key,
-                disabled=True
-            )
-
-
-    # Keep Balance Amount, Date of Slot Booked and Booking Status on one straight line.
-    # Reduce each field to a compact width appropriate to its content.
-    balance_column, date_slot_column, status_column, _booking_right_spacer = st.columns(
-        [0.75, 1.0, 0.85, 0.4]
-    )
-
-    with balance_column:
-
-        balance = (
-
-            total_payable
-
-            -
-
-            total_paid
-
-        )
-
-
-        data["balance_amount"] = float(balance)
-
-        balance_key = f"{sheet}_balance_amount_display"
-        st.session_state[balance_key] = f"{balance:,.2f}"
-        st.text_input(
-            "Balance Amount",
-            key=balance_key,
-            disabled=True
-        )
-
-
-    with date_slot_column:
-
-        st.date_input(
-
-            "Date of Slot Booked",
-
-            value=(
-
-                safe_date(
-
-                    data.get(
-
-                        "slot_date",
-
-                        str(
-
-                            date.today()
-
-                        )
-
-                    )
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                "slot_date"
-
-            )
-
-        )
-
-
-    status_options = [
-
-        "STATUS PENDING",
-
-        "REG. COMPLETED"
-
-    ]
-
-
-    saved_status = (
-
-        data.get(
-
-            "booking_status",
-
-            "STATUS PENDING"
-
-        )
-
-    )
-
-
-    if saved_status not in (
-        status_options
     ):
 
-        saved_status = (
-            "STATUS PENDING"
-        )
+        saved_sheet = (
 
+            st.session_state.get(
 
-    with status_column:
-
-        st.selectbox(
-
-            "Booking Status",
-
-            status_options,
-
-            index=(
-
-                status_options.index(
-
-                    saved_status
-
-                )
-
-            ),
-
-            key=(
-
-                f"{sheet}_"
-
-                "booking_status"
-
-            )
-
-        )
-
-
-    st.text_area(
-
-        "Notes",
-
-        value=(
-
-            data.get(
-
-                "notes",
+                "saved_sheet",
 
                 ""
 
             )
 
-        ),
-
-        height=70,
-
-        key=(
-
-            f"{sheet}_"
-
-            "notes"
-
         )
 
-    )
 
+        saved_pdf = (
 
-st.divider()
+            st.session_state.get(
 
+                "saved_pdf",
 
-# =========================================================
-# FINAL ACTIONS
-# =========================================================
+                b""
 
-# =========================================================
-# AUTO-SAVE CURRENT DRAFT
-# Keeps the current sheet and entered details available after a refresh.
-# =========================================================
-collect_data()
-save_database()
-
-
-st.markdown(
-    '<div class="section-title">💾 SAVE & DOCUMENT ACTIONS</div>',
-    unsafe_allow_html=True
-)
-
-def _get_email_settings():
-    """Read email settings from Streamlit secrets or environment variables."""
-    try:
-        cfg = st.secrets.get("email", {})
-    except Exception:
-        cfg = {}
-
-    sender = cfg.get("sender") or os.getenv("NSMART_EMAIL_SENDER")
-    password = cfg.get("password") or os.getenv("NSMART_EMAIL_PASSWORD")
-    recipient = cfg.get("recipient") or os.getenv("NSMART_EMAIL_RECIPIENT")
-    smtp_server = cfg.get("smtp_server") or os.getenv("NSMART_SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(cfg.get("smtp_port") or os.getenv("NSMART_SMTP_PORT", "465"))
-
-    return sender, password, recipient, smtp_server, smtp_port
-
-
-def _send_pdf_email(sheet_name, pdf_data, recipient_override=None):
-    sender, password, configured_recipient, smtp_server, smtp_port = _get_email_settings()
-    recipient = (recipient_override or configured_recipient or "").strip()
-
-    if not sender or not password:
-        return False, "Email is not configured yet. Add the email settings first."
-    if not recipient:
-        return False, "No recipient email address is configured."
-
-    msg = EmailMessage()
-    msg["Subject"] = f"N-SMART - {sheet_name}"
-    msg["From"] = sender
-    msg["To"] = recipient
-    msg.set_content(
-        f"Attached is the N-SMART document PDF for {sheet_name}.\n\n"
-        "This email was sent from N-SMART Online Services."
-    )
-    msg.add_attachment(
-        pdf_data,
-        maintype="application",
-        subtype="pdf",
-        filename=f"{sheet_name}.pdf"
-    )
-
-    try:
-        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as smtp:
-            smtp.login(sender, password)
-            smtp.send_message(msg)
-        return True, f"{sheet_name}.pdf sent successfully to {recipient}."
-    except Exception as exc:
-        return False, f"Email could not be sent: {exc}"
-
-
-
-
-# =========================================================
-# SAVE FILE
-# =========================================================
-
-# =========================================================
-# SAVE + DOWNLOAD + PRINT ACTIONS
-# =========================================================
-
-# Keep the three actions together. If this sheet has already been saved,
-# use the existing PDF; otherwise build a temporary PDF from the current data
-# so Download/Print are still available without removing any existing features.
-_current_sheet_for_actions = st.session_state.get("current_sheet", sheet)
-
-# Always rebuild the action PDF from the current cloud-loaded sheet data.
-# This prevents an old landscape PDF from being reused after the print
-# layout has been changed.
-_current_data_for_actions = st.session_state.database.get(
-    _current_sheet_for_actions,
-    {}
-)
-_current_pdf_for_actions = create_pdf(
-    _current_sheet_for_actions,
-    _current_data_for_actions
-)
-st.session_state["saved_pdf"] = _current_pdf_for_actions
-st.session_state["saved_sheet"] = _current_sheet_for_actions
-
-_action_save_col, _action_download_col, _action_print_col = st.columns(3)
-
-with _action_download_col:
-    if _current_pdf_for_actions:
-        st.download_button(
-            "📄 DOWNLOAD PDF",
-            data=_current_pdf_for_actions,
-            file_name=f"{_current_sheet_for_actions}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key=f"download_pdf_near_save_{_current_sheet_for_actions}"
-        )
-    else:
-        st.button(
-            "📄 DOWNLOAD PDF",
-            disabled=True,
-            use_container_width=True,
-            key=f"download_pdf_disabled_{_current_sheet_for_actions}",
-            help="Save the file once to generate the PDF."
-        )
-
-with _action_print_col:
-    if _current_pdf_for_actions:
-        # Use a Blob URL instead of a huge data: URL. Some browsers open large
-        # PDF data URLs as blank pages, which was causing the blank print window.
-        _print_b64 = base64.b64encode(
-            _current_pdf_for_actions
-        ).decode("utf-8")
-
-        _print_html = f"""
-        <html>
-        <body style="margin:0;padding:0;">
-            <button id="printBtn" style="
-                width:100%;
-                border:none;
-                border-radius:8px;
-                padding:0.62rem 0.8rem;
-                font-size:14px;
-                font-weight:700;
-                cursor:pointer;
-                background:#16a34a;
-                color:white;
-            ">🖨️ PRINT DOCUMENT</button>
-
-            <script>
-            document.getElementById("printBtn").addEventListener("click", function() {{
-                try {{
-                    const base64 = "{_print_b64}";
-                    const binary = atob(base64);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) {{
-                        bytes[i] = binary.charCodeAt(i);
-                    }}
-
-                    const blob = new Blob([bytes], {{
-                        type: "application/pdf"
-                    }});
-                    const url = URL.createObjectURL(blob);
-
-                    const printWindow = window.open(url, "_blank");
-                    if (printWindow) {{
-                        setTimeout(function() {{
-                            try {{
-                                printWindow.focus();
-                                printWindow.print();
-                            }} catch (e) {{
-                                console.error(e);
-                            }}
-                        }}, 1200);
-                    }} else {{
-                        alert("Please allow pop-ups to print the document.");
-                    }}
-                }} catch (err) {{
-                    console.error(err);
-                    alert("Unable to prepare the document for printing.");
-                }}
-            }});
-            </script>
-        </body>
-        </html>
-        """
-
-        st.components.v1.html(
-            _print_html,
-            height=52,
-            scrolling=False
-        )
-    else:
-        st.button(
-            "🖨️ PRINT DOCUMENT",
-            disabled=True,
-            use_container_width=True,
-            key=f"print_pdf_disabled_{_current_sheet_for_actions}",
-            help="Save the file once to generate the PDF."
-        )
-
-with _action_save_col:
-    if st.button(
-        "💾 SAVE FILE",
-        type="primary",
-        use_container_width=True,
-        key=(
-            f"{sheet}_"
-            "save_file"
-        )
-    ):
-
-        collect_data()
-
-        data = (
-            st.session_state.database[
-                sheet
-            ]
-        )
-
-        calculated_extent, invalid = (
-            total_extent(
-                data["surveys"]
-            )
-        )
-
-        if invalid:
-
-            st.error(
-                "The file was not saved. "
-                "Correct the invalid "
-                "extent first."
             )
 
-        else:
+        )
 
-            data["saved"] = True
 
-            save_database()
+        next_column = st.container()
 
-            pdf_bytes = (
-                create_pdf(
-                    sheet,
-                    data
-                )
+        with next_column:
+
+            # Open the next empty sheet in a completely separate browser tab.
+            # The current saved sheet and its session data are left untouched.
+            st.markdown(
+                f"""
+                <a href="./?new_sheet=1&auth={st.query_params.get("auth", "")}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   style="
+                        display:block;
+                        width:100%;
+                        box-sizing:border-box;
+                        text-align:center;
+                        padding:0.62rem 0.8rem;
+                        border-radius:0.55rem;
+                        text-decoration:none;
+                        font-weight:700;
+                        background:#2563eb;
+                        color:white;
+                        border:1px solid rgba(255,255,255,0.15);
+                    ">
+                    ➡️ OPEN NEXT EMPTY SHEET ↗
+                </a>
+                """,
+                unsafe_allow_html=True
             )
-
-            pdf_path = (
-                os.path.join(
-                    PDF_FOLDER,
-                    f"{sheet}.pdf"
-                )
-            )
-
-            with open(
-                pdf_path,
-                "wb"
-            ) as pdf_file:
-
-                pdf_file.write(
-                    pdf_bytes
-                )
-
-            st.session_state[
-                "saved_pdf"
-            ] = pdf_bytes
-
-            st.session_state[
-                "saved_sheet"
-            ] = sheet
-
-            st.session_state[
-                "show_saved_options"
-            ] = True
-
-            # Automatically send the generated PDF to the configured email on every save.
-            email_ok, email_message = _send_pdf_email(sheet, pdf_bytes)
-
-            if email_ok:
-                st.success(f"{sheet} saved successfully. {email_message}")
-            else:
-                st.warning(f"{sheet} saved successfully, but automatic email was not sent. {email_message}")
-
-            st.rerun()
-
-
-# =========================================================
-# PDF, PRINT AND NEXT SHEET
-# =========================================================
-
-if st.session_state.get(
-
-    "show_saved_options",
-
-    False
-
-):
-
-    saved_sheet = (
-
-        st.session_state.get(
-
-            "saved_sheet",
-
-            ""
-
-        )
-
-    )
-
-
-    saved_pdf = (
-
-        st.session_state.get(
-
-            "saved_pdf",
-
-            b""
-
-        )
-
-    )
-
-
-    next_column = st.container()
-
-    with next_column:
-
-        # Open the next empty sheet in a completely separate browser tab.
-        # The current saved sheet and its session data are left untouched.
-        st.markdown(
-            f"""
-            <a href="./?new_sheet=1&auth={st.query_params.get("auth", "")}"
-               target="_blank"
-               rel="noopener noreferrer"
-               style="
-                    display:block;
-                    width:100%;
-                    box-sizing:border-box;
-                    text-align:center;
-                    padding:0.62rem 0.8rem;
-                    border-radius:0.55rem;
-                    text-decoration:none;
-                    font-weight:700;
-                    background:#2563eb;
-                    color:white;
-                    border:1px solid rgba(255,255,255,0.15);
-                ">
-                ➡️ OPEN NEXT EMPTY SHEET ↗
-            </a>
-            """,
-            unsafe_allow_html=True
-        )
