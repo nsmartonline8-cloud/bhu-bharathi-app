@@ -731,7 +731,7 @@ st.markdown(
        original column layout, but repack the columns so there
        is no large empty space between fields.
        ========================================================= */
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: flex-start !important;
@@ -741,7 +741,7 @@ st.markdown(
         width: 100% !important;
     }
 
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         flex-grow: 0 !important;
         min-width: 0 !important;
         max-width: none !important;
@@ -749,42 +749,42 @@ st.markdown(
     }
 
     /* 2 original columns -> each field becomes 25% of the page. */
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(2)):not(:has(> [data-testid="stColumn"]:nth-child(3))) > [data-testid="stColumn"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(2)):not(:has(> [data-testid="stColumn"]:nth-child(3))) > [data-testid="stColumn"] {
         flex-basis: calc(25% - 0.45rem) !important;
     }
 
     /* 3 original columns -> each field becomes 1/6 of the page. */
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3)):not(:has(> [data-testid="stColumn"]:nth-child(4))) > [data-testid="stColumn"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3)):not(:has(> [data-testid="stColumn"]:nth-child(4))) > [data-testid="stColumn"] {
         flex-basis: calc(16.6667% - 0.45rem) !important;
     }
 
     /* 4 original columns -> each field becomes 1/8 of the page. */
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)):not(:has(> [data-testid="stColumn"]:nth-child(5))) > [data-testid="stColumn"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)):not(:has(> [data-testid="stColumn"]:nth-child(5))) > [data-testid="stColumn"] {
         flex-basis: calc(12.5% - 0.45rem) !important;
     }
 
     /* 5 original columns -> each field becomes 1/10 of the page. */
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(5)):not(:has(> [data-testid="stColumn"]:nth-child(6))) > [data-testid="stColumn"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(5)):not(:has(> [data-testid="stColumn"]:nth-child(6))) > [data-testid="stColumn"] {
         flex-basis: calc(10% - 0.45rem) !important;
     }
 
     /* 6+ columns are rare; keep them compact without overflowing. */
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(6)) > [data-testid="stColumn"] {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(6)) > [data-testid="stColumn"] {
         flex-basis: calc(8.3333% - 0.45rem) !important;
     }
 
-    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {
+    .document-step-layout ~ div [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {
         width: 100% !important;
         min-width: 0 !important;
     }
 
     /* The control fills its newly packed column; the column itself is the
        50%-sized replacement for the original field. */
-    .block-container:has(.document-step-layout) [data-testid="stTextInput"],
-    .block-container:has(.document-step-layout) [data-testid="stNumberInput"],
-    .block-container:has(.document-step-layout) [data-testid="stDateInput"],
-    .block-container:has(.document-step-layout) [data-testid="stSelectbox"],
-    .block-container:has(.document-step-layout) [data-testid="stTextArea"] {
+    .document-step-layout ~ div [data-testid="stTextInput"],
+    .document-step-layout ~ div [data-testid="stNumberInput"],
+    .document-step-layout ~ div [data-testid="stDateInput"],
+    .document-step-layout ~ div [data-testid="stSelectbox"],
+    .document-step-layout ~ div [data-testid="stTextArea"] {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
@@ -793,34 +793,34 @@ st.markdown(
         box-sizing: border-box !important;
     }
 
-    .block-container:has(.document-step-layout) [data-testid="stTextInput"] > div,
-    .block-container:has(.document-step-layout) [data-testid="stNumberInput"] > div,
-    .block-container:has(.document-step-layout) [data-testid="stDateInput"] > div,
-    .block-container:has(.document-step-layout) [data-testid="stSelectbox"] > div,
-    .block-container:has(.document-step-layout) [data-testid="stTextArea"] > div {
+    .document-step-layout ~ div [data-testid="stTextInput"] > div,
+    .document-step-layout ~ div [data-testid="stNumberInput"] > div,
+    .document-step-layout ~ div [data-testid="stDateInput"] > div,
+    .document-step-layout ~ div [data-testid="stSelectbox"] > div,
+    .document-step-layout ~ div [data-testid="stTextArea"] > div {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
     }
 
-    .block-container:has(.document-step-layout) [data-testid="stTextInput"] input,
-    .block-container:has(.document-step-layout) [data-testid="stNumberInput"] input,
-    .block-container:has(.document-step-layout) [data-testid="stDateInput"] input,
-    .block-container:has(.document-step-layout) [data-testid="stSelectbox"] [role="combobox"] {
+    .document-step-layout ~ div [data-testid="stTextInput"] input,
+    .document-step-layout ~ div [data-testid="stNumberInput"] input,
+    .document-step-layout ~ div [data-testid="stDateInput"] input,
+    .document-step-layout ~ div [data-testid="stSelectbox"] [role="combobox"] {
         min-height: 2.25rem !important;
         box-sizing: border-box !important;
     }
 
-    .block-container:has(.document-step-layout) [data-testid="stTextArea"] textarea {
+    .document-step-layout ~ div [data-testid="stTextArea"] textarea {
         min-height: 3.5rem !important;
         box-sizing: border-box !important;
     }
 
-    .block-container:has(.document-step-layout) [data-testid="stTextInput"] label,
-    .block-container:has(.document-step-layout) [data-testid="stNumberInput"] label,
-    .block-container:has(.document-step-layout) [data-testid="stDateInput"] label,
-    .block-container:has(.document-step-layout) [data-testid="stSelectbox"] label,
-    .block-container:has(.document-step-layout) [data-testid="stTextArea"] label {
+    .document-step-layout ~ div [data-testid="stTextInput"] label,
+    .document-step-layout ~ div [data-testid="stNumberInput"] label,
+    .document-step-layout ~ div [data-testid="stDateInput"] label,
+    .document-step-layout ~ div [data-testid="stSelectbox"] label,
+    .document-step-layout ~ div [data-testid="stTextArea"] label {
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
@@ -3873,7 +3873,7 @@ if saved_type not in document_types:
 # The document heading itself is the dropdown. There is no separate
 # "DOCUMENT TYPE" field; the selected option controls the document heading.
 # Keep the same widget/key, but center it and reduce its visible width by 50%.
-_header_left, _header_center, _header_right = st.columns([1, 2, 1])
+_header_left, _header_center, _header_right = st.columns([2.5, 1, 2.5])
 with _header_center:
     selected_document = st.selectbox(
         "DOCUMENT HEADING",
@@ -3905,15 +3905,6 @@ step_labels = {
     3: "3 • LAND",
     4: "4 • PAYMENT",
 }
-
-step_col1, step_col2, step_col3, step_col4 = st.columns(4)
-step_columns = [step_col1, step_col2, step_col3, step_col4]
-for step_number, step_column in enumerate(step_columns, 1):
-    with step_column:
-        st.markdown(
-            f"<div style='text-align:center;font-size:11px;font-weight:800;'>{step_labels[step_number]}</div>",
-            unsafe_allow_html=True
-        )
 
 current_step = st.radio(
     "DOCUMENT STEP",
