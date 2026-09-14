@@ -726,15 +726,31 @@ st.markdown(
     }
 
     /* =========================================================
-       DOCUMENT ENTRY STEPS — RESPONSIVE BOX LAYOUT
-       Fields automatically fill the space allocated to their
-       column. This keeps box-to-box spacing compact and even,
-       while allowing the whole four-step form to resize with
-       the browser/window.
+       DOCUMENT ENTRY STEPS — 50% COMPACT FIELD LAYOUT
+       Every input/select/date/textarea is exactly 50% of the
+       original widget width. Columns are packed toward the left
+       so the reduced boxes sit close together instead of staying
+       in their old full-width positions.
        ========================================================= */
     .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] {
-        column-gap: 0.65rem !important;
-        row-gap: 0.45rem !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: flex-start !important;
+        column-gap: 0.35rem !important;
+        row-gap: 0.20rem !important;
+        justify-content: flex-start !important;
+    }
+
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {
+        width: fit-content !important;
+        min-width: 0 !important;
     }
 
     .block-container:has(.document-step-layout) [data-testid="stTextInput"],
@@ -742,9 +758,11 @@ st.markdown(
     .block-container:has(.document-step-layout) [data-testid="stDateInput"],
     .block-container:has(.document-step-layout) [data-testid="stSelectbox"],
     .block-container:has(.document-step-layout) [data-testid="stTextArea"] {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin-bottom: 0 !important;
+        width: 50% !important;
+        max-width: 50% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding-bottom: 0 !important;
     }
 
     .block-container:has(.document-step-layout) [data-testid="stTextInput"] > div,
@@ -754,24 +772,31 @@ st.markdown(
     .block-container:has(.document-step-layout) [data-testid="stTextArea"] > div {
         width: 100% !important;
         max-width: 100% !important;
+        min-width: 0 !important;
     }
 
-    /* Keep field heights consistent and let text areas remain content-friendly. */
     .block-container:has(.document-step-layout) [data-testid="stTextInput"] input,
     .block-container:has(.document-step-layout) [data-testid="stNumberInput"] input,
     .block-container:has(.document-step-layout) [data-testid="stDateInput"] input,
     .block-container:has(.document-step-layout) [data-testid="stSelectbox"] [role="combobox"] {
-        min-height: 2.35rem !important;
+        min-height: 2.25rem !important;
         box-sizing: border-box !important;
     }
 
-    /* Reduce the vertical gap between consecutive form boxes. */
-    .block-container:has(.document-step-layout) [data-testid="stTextInput"],
-    .block-container:has(.document-step-layout) [data-testid="stNumberInput"],
-    .block-container:has(.document-step-layout) [data-testid="stDateInput"],
-    .block-container:has(.document-step-layout) [data-testid="stSelectbox"],
-    .block-container:has(.document-step-layout) [data-testid="stTextArea"] {
-        padding-bottom: 0 !important;
+    .block-container:has(.document-step-layout) [data-testid="stTextArea"] textarea {
+        min-height: 3.5rem !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Keep labels directly attached to their smaller controls. */
+    .block-container:has(.document-step-layout) [data-testid="stTextInput"] label,
+    .block-container:has(.document-step-layout) [data-testid="stNumberInput"] label,
+    .block-container:has(.document-step-layout) [data-testid="stDateInput"] label,
+    .block-container:has(.document-step-layout) [data-testid="stSelectbox"] label,
+    .block-container:has(.document-step-layout) [data-testid="stTextArea"] label {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     </style>
