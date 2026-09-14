@@ -726,29 +726,52 @@ st.markdown(
     }
 
     /* =========================================================
-       DOCUMENT ENTRY STEPS — FIELD WIDTHS
-       Every form field is displayed at 50% of its original
-       Streamlit widget width. The surrounding column/layout
-       remains unchanged. Buttons and section headers are not
-       affected.
+       DOCUMENT ENTRY STEPS — RESPONSIVE BOX LAYOUT
+       Fields automatically fill the space allocated to their
+       column. This keeps box-to-box spacing compact and even,
+       while allowing the whole four-step form to resize with
+       the browser/window.
        ========================================================= */
-    [data-testid="stTextInput"],
-    [data-testid="stNumberInput"],
-    [data-testid="stDateInput"],
-    [data-testid="stSelectbox"],
-    [data-testid="stTextArea"] {
-        width: 50% !important;
-        max-width: 50% !important;
+    .block-container:has(.document-step-layout) [data-testid="stHorizontalBlock"] {
+        column-gap: 0.65rem !important;
+        row-gap: 0.45rem !important;
     }
 
-    /* Keep the actual control filling its new half-width widget. */
-    [data-testid="stTextInput"] > div,
-    [data-testid="stNumberInput"] > div,
-    [data-testid="stDateInput"] > div,
-    [data-testid="stSelectbox"] > div,
-    [data-testid="stTextArea"] > div {
+    .block-container:has(.document-step-layout) [data-testid="stTextInput"],
+    .block-container:has(.document-step-layout) [data-testid="stNumberInput"],
+    .block-container:has(.document-step-layout) [data-testid="stDateInput"],
+    .block-container:has(.document-step-layout) [data-testid="stSelectbox"],
+    .block-container:has(.document-step-layout) [data-testid="stTextArea"] {
         width: 100% !important;
         max-width: 100% !important;
+        margin-bottom: 0 !important;
+    }
+
+    .block-container:has(.document-step-layout) [data-testid="stTextInput"] > div,
+    .block-container:has(.document-step-layout) [data-testid="stNumberInput"] > div,
+    .block-container:has(.document-step-layout) [data-testid="stDateInput"] > div,
+    .block-container:has(.document-step-layout) [data-testid="stSelectbox"] > div,
+    .block-container:has(.document-step-layout) [data-testid="stTextArea"] > div {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Keep field heights consistent and let text areas remain content-friendly. */
+    .block-container:has(.document-step-layout) [data-testid="stTextInput"] input,
+    .block-container:has(.document-step-layout) [data-testid="stNumberInput"] input,
+    .block-container:has(.document-step-layout) [data-testid="stDateInput"] input,
+    .block-container:has(.document-step-layout) [data-testid="stSelectbox"] [role="combobox"] {
+        min-height: 2.35rem !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Reduce the vertical gap between consecutive form boxes. */
+    .block-container:has(.document-step-layout) [data-testid="stTextInput"],
+    .block-container:has(.document-step-layout) [data-testid="stNumberInput"],
+    .block-container:has(.document-step-layout) [data-testid="stDateInput"],
+    .block-container:has(.document-step-layout) [data-testid="stSelectbox"],
+    .block-container:has(.document-step-layout) [data-testid="stTextArea"] {
+        padding-bottom: 0 !important;
     }
 
     </style>
@@ -3851,6 +3874,10 @@ current_step = st.radio(
     label_visibility="collapsed"
 )
 st.session_state.document_step = current_step
+
+# Marker used by the responsive document-entry CSS so dashboard/account
+# widgets keep their normal sizing.
+st.markdown('<div class="document-step-layout"></div>', unsafe_allow_html=True)
 
 st.markdown(
     f"<div style=\"text-align:center;margin:4px 0 14px;font-size:14px;font-weight:800;color:#2563eb;\">STEP {current_step} OF 4 — {step_labels[current_step].split(' • ', 1)[1]}</div>",
