@@ -725,6 +725,32 @@ st.markdown(
         margin: 0 0 2px 0 !important;
     }
 
+    /* =========================================================
+       DOCUMENT ENTRY STEPS — FIELD WIDTHS
+       Every form field is displayed at 50% of its original
+       Streamlit widget width. The surrounding column/layout
+       remains unchanged. Buttons and section headers are not
+       affected.
+       ========================================================= */
+    [data-testid="stTextInput"],
+    [data-testid="stNumberInput"],
+    [data-testid="stDateInput"],
+    [data-testid="stSelectbox"],
+    [data-testid="stTextArea"] {
+        width: 50% !important;
+        max-width: 50% !important;
+    }
+
+    /* Keep the actual control filling its new half-width widget. */
+    [data-testid="stTextInput"] > div,
+    [data-testid="stNumberInput"] > div,
+    [data-testid="stDateInput"] > div,
+    [data-testid="stSelectbox"] > div,
+    [data-testid="stTextArea"] > div {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
